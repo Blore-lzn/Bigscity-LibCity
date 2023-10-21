@@ -13,5 +13,5 @@
   "output_window": 12,
   "add_time_in_day": false,
   "add_day_in_week": false,
-  "use_row_column": true
+  "use_row_column": false
 }
