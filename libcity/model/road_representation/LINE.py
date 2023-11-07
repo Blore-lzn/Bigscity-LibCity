@@ -55,26 +55,26 @@ class LINE_SECOND(nn.Module):
 class LINE(AbstractTrafficStateModel):
     def __init__(self, config, data_feature):
         super().__init__(config, data_feature)
-        self.device = config.get('device')
+        self.device = config.get("device")
 
-        self.order = config.get('order')
-        self.output_dim = config.get('output_dim')
+        self.order = config.get("order")
+        self.output_dim = config.get("output_dim")
         self.num_nodes = data_feature.get("num_nodes")
         self.num_edges = data_feature.get("num_edges")
 
-        if self.order == 'first':
+        if self.order == "first":
             self.embed = LINE_FIRST(self.num_nodes, self.output_dim)
-        elif self.order == 'second':
+        elif self.order == "second":
             self.embed = LINE_SECOND(self.num_nodes, self.output_dim)
         else:
             raise ValueError("order mode must be first or second")
 
-        self.model = config.get('model', '')
-        self.dataset = config.get('dataset', '')
-        self.exp_id = config.get('exp_id', None)
+        self.model = config.get("model", "")
+        self.dataset = config.get("dataset", "")
+        self.exp_id = config.get("exp_id", None)
 
     def calculate_loss(self, batch):
-        I, J, is_neg = batch['I'], batch['J'], batch['Neg']
+        I, J, is_neg = batch["I"], batch["J"], batch["Neg"]
         dot_product = self.forward(I, J)
         return -(F.logsigmoid(dot_product * is_neg)).mean()
 
@@ -89,7 +89,10 @@ class LINE(AbstractTrafficStateModel):
             elif order == 'second':
                 [u'_j^T * v_i for (i,j) in zip(I, J)]; (B,)
         """
-        np.save('./libcity/cache/{}/evaluate_cache/embedding_{}_{}_{}.npy'
-                .format(self.exp_id, self.model, self.dataset, self.output_dim),
-                self.embed.get_embeddings().cpu().numpy())
+        np.save(
+            "./libcity/cache/{}/evaluate_cache/embedding_{}_{}_{}.npy".format(
+                self.exp_id, self.model, self.dataset, self.output_dim
+            ),
+            self.embed.get_embeddings().cpu().numpy(),
+        )
         return self.embed(I, J)

@@ -15,16 +15,22 @@ def sym_adj(adj):
     adj = sp.coo_matrix(adj)
     rowsum = np.array(adj.sum(1))
     d_inv_sqrt = np.power(rowsum, -0.5).flatten()
-    d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0.
+    d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0.0
     d_mat_inv_sqrt = sp.diags(d_inv_sqrt)
-    return adj.dot(d_mat_inv_sqrt).transpose().dot(d_mat_inv_sqrt).astype(np.float32).todense()
+    return (
+        adj.dot(d_mat_inv_sqrt)
+        .transpose()
+        .dot(d_mat_inv_sqrt)
+        .astype(np.float32)
+        .todense()
+    )
 
 
 def asym_adj(adj):
     adj = sp.coo_matrix(adj)
     rowsum = np.array(adj.sum(1)).flatten()
     d_inv = np.power(rowsum, -1).flatten()
-    d_inv[np.isinf(d_inv)] = 0.
+    d_inv[np.isinf(d_inv)] = 0.0
     d_mat = sp.diags(d_inv)
     return d_mat.dot(adj).astype(np.float32).todense()
 
@@ -39,9 +45,12 @@ def calculate_normalized_laplacian(adj):
     adj = sp.coo_matrix(adj)
     d = np.array(adj.sum(1))
     d_inv_sqrt = np.power(d, -0.5).flatten()
-    d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0.
+    d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0.0
     d_mat_inv_sqrt = sp.diags(d_inv_sqrt)
-    normalized_laplacian = sp.eye(adj.shape[0]) - adj.dot(d_mat_inv_sqrt).transpose().dot(d_mat_inv_sqrt).tocoo()
+    normalized_laplacian = (
+        sp.eye(adj.shape[0])
+        - adj.dot(d_mat_inv_sqrt).transpose().dot(d_mat_inv_sqrt).tocoo()
+    )
     return normalized_laplacian
 
 
@@ -50,11 +59,11 @@ def calculate_scaled_laplacian(adj_mx, lambda_max=2, undirected=True):
         adj_mx = np.maximum.reduce([adj_mx, adj_mx.T])
     lap = calculate_normalized_laplacian(adj_mx)
     if lambda_max is None:
-        lambda_max, _ = linalg.eigsh(lap, 1, which='LM')
+        lambda_max, _ = linalg.eigsh(lap, 1, which="LM")
         lambda_max = lambda_max[0]
     lap = sp.csr_matrix(lap)
     m, _ = lap.shape
-    identity = sp.identity(m, format='csr', dtype=lap.dtype)
+    identity = sp.identity(m, format="csr", dtype=lap.dtype)
     lap = (2 / lambda_max * lap) - identity
     return lap.astype(np.float32).todense()
 
@@ -65,7 +74,7 @@ class nconv(nn.Module):
 
     def forward(self, x, A):
         A = A.transpose(-1, -2)
-        x = torch.einsum('ncvl,vw->ncwl', x, A)
+        x = torch.einsum("ncvl,vw->ncwl", x, A)
         return x.contiguous()
 
 
@@ -100,10 +109,8 @@ class multi_gcn_time(nn.Module):
 class TATT_1(nn.Module):
     def __init__(self, c_in, num_nodes, tem_size):
         super(TATT_1, self).__init__()
-        self.conv1 = Conv2d(c_in, 1, kernel_size=(1, 1),
-                            stride=(1, 1), bias=False)
-        self.conv2 = Conv2d(num_nodes, 1, kernel_size=(1, 1),
-                            stride=(1, 1), bias=False)
+        self.conv1 = Conv2d(c_in, 1, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        self.conv2 = Conv2d(num_nodes, 1, kernel_size=(1, 1), stride=(1, 1), bias=False)
         self.w = nn.Parameter(torch.rand(num_nodes, c_in), requires_grad=True)
         nn.init.xavier_uniform_(self.w)
         self.b = nn.Parameter(torch.zeros(tem_size, tem_size), requires_grad=True)
@@ -131,22 +138,43 @@ class TATT_1(nn.Module):
 class linear_time(nn.Module):
     def __init__(self, c_in, c_out, Kt):
         super(linear_time, self).__init__()
-        self.mlp = torch.nn.Conv2d(c_in, c_out, kernel_size=(1, Kt), padding=(0, 0), stride=(1, 1), bias=True)
+        self.mlp = torch.nn.Conv2d(
+            c_in, c_out, kernel_size=(1, Kt), padding=(0, 0), stride=(1, 1), bias=True
+        )
 
     def forward(self, x):
         return self.mlp(x)
 
 
 class GCNPool(nn.Module):
-    ''' #GCN      S-T Blocks'''
+    """#GCN      S-T Blocks"""
 
-    def __init__(self, c_in, c_out, num_nodes, tem_size,
-                 Kt, dropout, pool_nodes, support_len=3, order=2):
+    def __init__(
+        self,
+        c_in,
+        c_out,
+        num_nodes,
+        tem_size,
+        Kt,
+        dropout,
+        pool_nodes,
+        support_len=3,
+        order=2,
+    ):
         super(GCNPool, self).__init__()
-        self.time_conv = Conv2d(c_in, 2 * c_out, kernel_size=(1, Kt), padding=(0, 0),
-                                stride=(1, 1), bias=True, dilation=2)
+        self.time_conv = Conv2d(
+            c_in,
+            2 * c_out,
+            kernel_size=(1, Kt),
+            padding=(0, 0),
+            stride=(1, 1),
+            bias=True,
+            dilation=2,
+        )
 
-        self.multigcn = multi_gcn_time(c_out, 2 * c_out, Kt, dropout, support_len, order)
+        self.multigcn = multi_gcn_time(
+            c_out, 2 * c_out, Kt, dropout, support_len, order
+        )
 
         self.num_nodes = num_nodes
         self.tem_size = tem_size
@@ -155,8 +183,7 @@ class GCNPool(nn.Module):
         # self.bn=LayerNorm([c_out,num_nodes,tem_size])
         self.bn = BatchNorm2d(c_out)
 
-        self.conv1 = Conv2d(c_in, c_out, kernel_size=(1, 1),
-                            stride=(1, 1), bias=True)
+        self.conv1 = Conv2d(c_in, c_out, kernel_size=(1, 1), stride=(1, 1), bias=True)
 
     def forward(self, x, support):
         residual = self.conv1(x)
@@ -172,20 +199,18 @@ class GCNPool(nn.Module):
 
         T_coef = self.TAT(x)
         T_coef = T_coef.transpose(-1, -2)
-        x = torch.einsum('bcnl,blq->bcnq', x, T_coef)
-        out = self.bn(x + residual[:, :, :, -x.size(3):])
+        x = torch.einsum("bcnl,blq->bcnq", x, T_coef)
+        out = self.bn(x + residual[:, :, :, -x.size(3) :])
         return out
 
 
 class Transmit(nn.Module):
-    '''#Transfer Blocks  交换层'''
+    """#Transfer Blocks  交换层"""
 
     def __init__(self, c_in, tem_size, transmit, num_nodes, cluster_nodes):
         super(Transmit, self).__init__()
-        self.conv1 = Conv2d(c_in, 1, kernel_size=(1, 1),
-                            stride=(1, 1), bias=False)
-        self.conv2 = Conv2d(tem_size, 1, kernel_size=(1, 1),
-                            stride=(1, 1), bias=False)
+        self.conv1 = Conv2d(c_in, 1, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        self.conv2 = Conv2d(tem_size, 1, kernel_size=(1, 1), stride=(1, 1), bias=False)
         self.w = nn.Parameter(torch.rand(tem_size, c_in), requires_grad=True)
         torch.nn.init.xavier_uniform_(self.w)
         self.b = nn.Parameter(torch.zeros(num_nodes, cluster_nodes), requires_grad=True)
@@ -211,8 +236,9 @@ class Transmit(nn.Module):
 class gate(nn.Module):
     def __init__(self, c_in):
         super(gate, self).__init__()
-        self.conv1 = Conv2d(c_in, c_in // 2, kernel_size=(1, 1),
-                            stride=(1, 1), bias=True)
+        self.conv1 = Conv2d(
+            c_in, c_in // 2, kernel_size=(1, 1), stride=(1, 1), bias=True
+        )
 
     def forward(self, seq, seq_cluster):
         # x=torch.cat((seq_cluster,seq),1)
@@ -226,71 +252,101 @@ class HGCN(AbstractTrafficStateModel):
     def __init__(self, config, data_feature):
         super().__init__(config, data_feature)
 
-        self.device = config.get('device', torch.device('cpu'))
+        self.device = config.get("device", torch.device("cpu"))
 
-        self._scaler = self.data_feature.get('scaler')
-        self.num_nodes = self.data_feature.get('num_nodes', 1)
-        self.feature_dim = self.data_feature.get('feature_dim', 1)
-        self.output_dim = self.data_feature.get('output_dim', 1)
-        self.transmit = self.data_feature.get('transmit').to(self.device)
-        self.adjtype = config.get('adjtype', 'doubletransition')
-        self.adj_mx = self.cal_adj(self.data_feature.get('adj_mx'), self.adjtype)
-        self.adj_mx_cluster = self.cal_adj(self.data_feature.get('adj_mx_cluster'), self.adjtype)
-        self.centers_ind_groups = self.data_feature.get('centers_ind_groups')
+        self._scaler = self.data_feature.get("scaler")
+        self.num_nodes = self.data_feature.get("num_nodes", 1)
+        self.feature_dim = self.data_feature.get("feature_dim", 1)
+        self.output_dim = self.data_feature.get("output_dim", 1)
+        self.transmit = self.data_feature.get("transmit").to(self.device)
+        self.adjtype = config.get("adjtype", "doubletransition")
+        self.adj_mx = self.cal_adj(self.data_feature.get("adj_mx"), self.adjtype)
+        self.adj_mx_cluster = self.cal_adj(
+            self.data_feature.get("adj_mx_cluster"), self.adjtype
+        )
+        self.centers_ind_groups = self.data_feature.get("centers_ind_groups")
 
         self._logger = getLogger()
 
-        self.input_window = config.get('input_window', 12)
-        self.output_window = config.get('output_window', 12)
+        self.input_window = config.get("input_window", 12)
+        self.output_window = config.get("output_window", 12)
 
-        self.cluster_nodes = config.get('cluster_nodes', 1)
-        self.dropout = config.get('dropout', 0)
-        self.channels = config.get('channels', 32)
-        self.skip_channels = config.get('skip_channels', 32)
-        self.end_channels = config.get('end_channels', 512)
+        self.cluster_nodes = config.get("cluster_nodes", 1)
+        self.dropout = config.get("dropout", 0)
+        self.channels = config.get("channels", 32)
+        self.skip_channels = config.get("skip_channels", 32)
+        self.end_channels = config.get("end_channels", 512)
 
         self.supports = [torch.tensor(i).to(self.device) for i in self.adj_mx]
-        self.supports_cluster = [torch.tensor(i).to(self.device) for i in self.adj_mx_cluster]
+        self.supports_cluster = [
+            torch.tensor(i).to(self.device) for i in self.adj_mx_cluster
+        ]
         self.supports_len = torch.tensor(0, device=self.device)
         self.supports_len_cluster = torch.tensor(0, device=self.device)
 
         self.supports_len += len(self.supports)
         self.supports_len_cluster += len(self.supports_cluster)
 
-        self.start_conv = nn.Conv2d(in_channels=self.feature_dim,
-                                    out_channels=self.channels,
-                                    kernel_size=(1, 1))
-        self.start_conv_cluster = nn.Conv2d(in_channels=self.feature_dim,
-                                            out_channels=self.channels,
-                                            kernel_size=(1, 1))
+        self.start_conv = nn.Conv2d(
+            in_channels=self.feature_dim, out_channels=self.channels, kernel_size=(1, 1)
+        )
+        self.start_conv_cluster = nn.Conv2d(
+            in_channels=self.feature_dim, out_channels=self.channels, kernel_size=(1, 1)
+        )
 
-        self.h = Parameter(torch.zeros(self.num_nodes, self.num_nodes), requires_grad=True)
+        self.h = Parameter(
+            torch.zeros(self.num_nodes, self.num_nodes), requires_grad=True
+        )
         nn.init.uniform_(self.h, a=0, b=0.0001)
-        self.h_cluster = Parameter(torch.zeros(self.cluster_nodes, self.cluster_nodes), requires_grad=True)
+        self.h_cluster = Parameter(
+            torch.zeros(self.cluster_nodes, self.cluster_nodes), requires_grad=True
+        )
         nn.init.uniform_(self.h_cluster, a=0, b=0.0001)
         self.supports_len += 1
         self.supports_len_cluster += 1
-        self.nodevec1 = nn.Parameter(torch.randn(self.num_nodes, 10), requires_grad=True)
-        self.nodevec2 = nn.Parameter(torch.randn(10, self.num_nodes), requires_grad=True)
-        self.nodevec1_c = nn.Parameter(torch.randn(self.cluster_nodes, 10), requires_grad=True)
-        self.nodevec2_c = nn.Parameter(torch.randn(10, self.cluster_nodes), requires_grad=True)
+        self.nodevec1 = nn.Parameter(
+            torch.randn(self.num_nodes, 10), requires_grad=True
+        )
+        self.nodevec2 = nn.Parameter(
+            torch.randn(10, self.num_nodes), requires_grad=True
+        )
+        self.nodevec1_c = nn.Parameter(
+            torch.randn(self.cluster_nodes, 10), requires_grad=True
+        )
+        self.nodevec2_c = nn.Parameter(
+            torch.randn(10, self.cluster_nodes), requires_grad=True
+        )
 
-        self.block1 = GCNPool(2 * self.channels, self.channels, self.num_nodes, self.input_window - 6, 3,
-                              self.dropout, self.num_nodes,
-                              self.supports_len)
-        self.block2 = GCNPool(2 * self.channels, self.channels, self.num_nodes, self.input_window - 9, 2,
-                              self.dropout, self.num_nodes,
-                              self.supports_len)
+        self.block1 = GCNPool(
+            2 * self.channels,
+            self.channels,
+            self.num_nodes,
+            self.input_window - 6,
+            3,
+            self.dropout,
+            self.num_nodes,
+            self.supports_len,
+        )
+        self.block2 = GCNPool(
+            2 * self.channels,
+            self.channels,
+            self.num_nodes,
+            self.input_window - 9,
+            2,
+            self.dropout,
+            self.num_nodes,
+            self.supports_len,
+        )
 
         self.block_cluster1 = GCNPool(
             c_in=self.channels,
             c_out=self.channels,
             num_nodes=self.cluster_nodes,
-            tem_size=self.input_window-6,
+            tem_size=self.input_window - 6,
             Kt=3,
             dropout=self.dropout,
             pool_nodes=self.cluster_nodes,
-            support_len=self.supports_len
+            support_len=self.supports_len,
         )
         self.block_cluster2 = GCNPool(
             c_in=self.channels,
@@ -300,23 +356,37 @@ class HGCN(AbstractTrafficStateModel):
             Kt=2,
             dropout=self.dropout,
             pool_nodes=self.cluster_nodes,
-            support_len=self.supports_len
+            support_len=self.supports_len,
         )
 
-        self.skip_conv1 = Conv2d(2 * self.channels, self.skip_channels, kernel_size=(1, 1),
-                                 stride=(1, 1), bias=True)
-        self.skip_conv2 = Conv2d(2 * self.channels, self.skip_channels, kernel_size=(1, 1),
-                                 stride=(1, 1), bias=True)
+        self.skip_conv1 = Conv2d(
+            2 * self.channels,
+            self.skip_channels,
+            kernel_size=(1, 1),
+            stride=(1, 1),
+            bias=True,
+        )
+        self.skip_conv2 = Conv2d(
+            2 * self.channels,
+            self.skip_channels,
+            kernel_size=(1, 1),
+            stride=(1, 1),
+            bias=True,
+        )
 
-        self.end_conv_1 = nn.Conv2d(in_channels=self.skip_channels,
-                                    out_channels=self.end_channels,
-                                    kernel_size=(1, 3),
-                                    bias=True)
+        self.end_conv_1 = nn.Conv2d(
+            in_channels=self.skip_channels,
+            out_channels=self.end_channels,
+            kernel_size=(1, 3),
+            bias=True,
+        )
 
-        self.end_conv_2 = nn.Conv2d(in_channels=self.end_channels,
-                                    out_channels=self.output_window,
-                                    kernel_size=(1, 1),
-                                    bias=True)
+        self.end_conv_2 = nn.Conv2d(
+            in_channels=self.end_channels,
+            out_channels=self.output_window,
+            kernel_size=(1, 1),
+            bias=True,
+        )
 
         self.bn = BatchNorm2d(self.feature_dim, affine=False)
 
@@ -325,24 +395,47 @@ class HGCN(AbstractTrafficStateModel):
         self.gate2 = gate(2 * self.channels)
         self.gate3 = gate(2 * self.channels)
 
-        self.transmit1 = Transmit(self.channels, self.input_window, self.transmit, self.num_nodes,
-                                  self.cluster_nodes)
-        self.transmit2 = Transmit(self.channels, self.input_window - 6, self.transmit, self.num_nodes,
-                                  self.cluster_nodes)
-        self.transmit3 = Transmit(self.channels, self.input_window - 9, self.transmit, self.num_nodes,
-                                  self.cluster_nodes)
+        self.transmit1 = Transmit(
+            self.channels,
+            self.input_window,
+            self.transmit,
+            self.num_nodes,
+            self.cluster_nodes,
+        )
+        self.transmit2 = Transmit(
+            self.channels,
+            self.input_window - 6,
+            self.transmit,
+            self.num_nodes,
+            self.cluster_nodes,
+        )
+        self.transmit3 = Transmit(
+            self.channels,
+            self.input_window - 9,
+            self.transmit,
+            self.num_nodes,
+            self.cluster_nodes,
+        )
         self.linear = nn.Linear(1, self.output_dim, bias=True)
 
     def get_input_cluster(self, input):
-        batch_size, input_length, feature_dim = input.shape[0], input.shape[1], input.shape[
-            3]
+        batch_size, input_length, feature_dim = (
+            input.shape[0],
+            input.shape[1],
+            input.shape[3],
+        )
 
-        input_cluster = torch.zeros([batch_size, input_length, self.cluster_nodes, feature_dim], dtype=torch.float,
-                                    device=self.device)
+        input_cluster = torch.zeros(
+            [batch_size, input_length, self.cluster_nodes, feature_dim],
+            dtype=torch.float,
+            device=self.device,
+        )
 
         for k in range(self.cluster_nodes):
-            input_cluster[:, :, k, :] = input[:, :, self.centers_ind_groups[k][0], :] + \
-                                        input[:, :, self.centers_ind_groups[k][0], :]
+            input_cluster[:, :, k, :] = (
+                input[:, :, self.centers_ind_groups[k][0], :]
+                + input[:, :, self.centers_ind_groups[k][0], :]
+            )
         return input_cluster
 
     def cal_adj(self, adj, adjtype):
@@ -363,7 +456,7 @@ class HGCN(AbstractTrafficStateModel):
         return adj_mx
 
     def forward(self, batch):
-        input = batch['X'].permute(0, 3, 2, 1)
+        input = batch["X"].permute(0, 3, 2, 1)
 
         input_cluster = self.get_input_cluster(input)
 
@@ -390,7 +483,7 @@ class HGCN(AbstractTrafficStateModel):
         x_cluster = self.start_conv_cluster(x_cluster)
         transmit1 = self.transmit1(x, x_cluster)
 
-        x_1 = (torch.einsum('bmn,bcnl->bcml', transmit1, x_cluster))
+        x_1 = torch.einsum("bmn,bcnl->bcml", transmit1, x_cluster)
 
         x = self.gate1(x, x_1)
 
@@ -400,7 +493,7 @@ class HGCN(AbstractTrafficStateModel):
         x_cluster = self.block_cluster1(x_cluster, new_supports_cluster)
         x = self.block1(x, new_supports)
         transmit2 = self.transmit2(x, x_cluster)
-        x_2 = (torch.einsum('bmn,bcnl->bcml', transmit2, x_cluster))
+        x_2 = torch.einsum("bmn,bcnl->bcml", transmit2, x_cluster)
 
         x = self.gate2(x, x_2)
 
@@ -411,12 +504,12 @@ class HGCN(AbstractTrafficStateModel):
         x_cluster = self.block_cluster2(x_cluster, new_supports_cluster)
         x = self.block2(x, new_supports)
         transmit3 = self.transmit3(x, x_cluster)
-        x_3 = (torch.einsum('bmn,bcnl->bcml', transmit3, x_cluster))
+        x_3 = torch.einsum("bmn,bcnl->bcml", transmit3, x_cluster)
 
         x = self.gate3(x, x_3)
 
         s2 = self.skip_conv2(x)
-        skip = skip[:, :, :, -s2.size(3):]
+        skip = skip[:, :, :, -s2.size(3) :]
         skip = s2 + skip
 
         # output
@@ -427,13 +520,15 @@ class HGCN(AbstractTrafficStateModel):
         return x
 
     def calculate_loss(self, batch):
-        y_true = batch['y'].to(self.device)
+        y_true = batch["y"].to(self.device)
 
         output = self.predict(batch)
         y_predicted = output
 
-        y_true = self._scaler.inverse_transform(y_true[..., :self.output_dim])
-        y_predicted = self._scaler.inverse_transform(y_predicted[..., :self.output_dim])
+        y_true = self._scaler.inverse_transform(y_true[..., : self.output_dim])
+        y_predicted = self._scaler.inverse_transform(
+            y_predicted[..., : self.output_dim]
+        )
         res = loss.masked_mae_torch(y_predicted, y_true, 0)
 
         return res

@@ -36,7 +36,7 @@ class AbstractETAEncoder(object):
         self.pad_item = {}
         self.feature_dict = {}
         self.data_feature = {}
-        self.cache_file_name = ''
+        self.cache_file_name = ""
 
     def encode(self, uid, trajectories, dyna_feature_column):
         """Encode trajectories of user uid.

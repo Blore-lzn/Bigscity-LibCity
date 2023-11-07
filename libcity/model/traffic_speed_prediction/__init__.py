@@ -41,5 +41,5 @@ __all__ = [
     "STTN",
     "D2STGNN",
     "FNN",
-    "STID"
+    "STID",
 ]

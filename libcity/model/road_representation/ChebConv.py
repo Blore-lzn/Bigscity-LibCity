@@ -12,8 +12,17 @@ class ChebConvModule(nn.Module):
     路网表征模型的基类并不统一
     图卷积，将N*C的输入矩阵映射成N*F的输出矩阵，其中邻接矩阵形状N*N。
     """
-    def __init__(self, num_nodes, max_diffusion_step, adj_mx,
-                 device, input_dim, output_dim, filter_type):
+
+    def __init__(
+        self,
+        num_nodes,
+        max_diffusion_step,
+        adj_mx,
+        device,
+        input_dim,
+        output_dim,
+        filter_type,
+    ):
         """
         K阶切比雪夫估计
         Args:
@@ -39,7 +48,9 @@ class ChebConvModule(nn.Module):
         self._output_dim = output_dim
         shape = (self._input_dim * self._ks, self._output_dim)
         self.weight = torch.nn.Parameter(torch.empty(*shape, device=self._device))
-        self.biases = torch.nn.Parameter(torch.empty(self._output_dim, device=self._device))
+        self.biases = torch.nn.Parameter(
+            torch.empty(self._output_dim, device=self._device)
+        )
         torch.nn.init.xavier_normal_(self.weight)
         torch.nn.init.constant_(self.biases, 0)
 
@@ -72,7 +83,9 @@ class ChebConvModule(nn.Module):
 
         x = torch.reshape(x, shape=[self._ks, self._num_nodes, input_dim])  # (Ks, N, C)
         x = x.permute(1, 2, 0)  # (N, C, Ks)
-        x = torch.reshape(x, shape=[self._num_nodes, input_dim * self._ks])  # (N, Ks * C)
+        x = torch.reshape(
+            x, shape=[self._num_nodes, input_dim * self._ks]
+        )  # (N, Ks * C)
         # (N, Ks * C) * (Ks * C, F)  --> (N, F)
         x = torch.matmul(x, self.weight)  # (N, F)
         x += self.biases  # (N, F)
@@ -82,28 +95,40 @@ class ChebConvModule(nn.Module):
 class ChebConv(AbstractTrafficStateModel):
     def __init__(self, config, data_feature):
         super().__init__(config, data_feature)
-        self.adj_mx = data_feature.get('adj_mx')
-        self.num_nodes = data_feature.get('num_nodes', 1)
-        self.feature_dim = data_feature.get('feature_dim', 1)
-        config['num_nodes'] = self.num_nodes
-        config['feature_dim'] = self.feature_dim
-        self.device = config.get('device', torch.device('cpu'))
+        self.adj_mx = data_feature.get("adj_mx")
+        self.num_nodes = data_feature.get("num_nodes", 1)
+        self.feature_dim = data_feature.get("feature_dim", 1)
+        config["num_nodes"] = self.num_nodes
+        config["feature_dim"] = self.feature_dim
+        self.device = config.get("device", torch.device("cpu"))
         self._logger = getLogger()
-        self._scaler = self.data_feature.get('scaler')
+        self._scaler = self.data_feature.get("scaler")
 
-        self.max_diffusion_step = config.get('max_diffusion_step', 2)
-        self.output_dim = config.get('output_dim', 32)
-        self.filter_type = config.get('filter_type', 'dual_random_walk')
-        self.model = config.get('model', '')
-        self.dataset = config.get('dataset', '')
-        self.exp_id = config.get('exp_id', None)
+        self.max_diffusion_step = config.get("max_diffusion_step", 2)
+        self.output_dim = config.get("output_dim", 32)
+        self.filter_type = config.get("filter_type", "dual_random_walk")
+        self.model = config.get("model", "")
+        self.dataset = config.get("dataset", "")
+        self.exp_id = config.get("exp_id", None)
 
-        self.encoder = ChebConvModule(num_nodes=self.num_nodes, max_diffusion_step=self.max_diffusion_step,
-                                      adj_mx=self.adj_mx, device=self.device, input_dim=self.feature_dim,
-                                      output_dim=self.output_dim, filter_type=self.filter_type)
-        self.decoder = ChebConvModule(num_nodes=self.num_nodes, max_diffusion_step=self.max_diffusion_step,
-                                      adj_mx=self.adj_mx, device=self.device, input_dim=self.output_dim,
-                                      output_dim=self.feature_dim, filter_type=self.filter_type)
+        self.encoder = ChebConvModule(
+            num_nodes=self.num_nodes,
+            max_diffusion_step=self.max_diffusion_step,
+            adj_mx=self.adj_mx,
+            device=self.device,
+            input_dim=self.feature_dim,
+            output_dim=self.output_dim,
+            filter_type=self.filter_type,
+        )
+        self.decoder = ChebConvModule(
+            num_nodes=self.num_nodes,
+            max_diffusion_step=self.max_diffusion_step,
+            adj_mx=self.adj_mx,
+            device=self.device,
+            input_dim=self.output_dim,
+            output_dim=self.feature_dim,
+            filter_type=self.filter_type,
+        )
 
     def forward(self, batch):
         """
@@ -116,11 +141,14 @@ class ChebConv(AbstractTrafficStateModel):
             torch.tensor: N, feature_dim
 
         """
-        inputs = batch['node_features']
+        inputs = batch["node_features"]
         encoder_state = self.encoder(inputs)  # N, output_dim
-        np.save('./libcity/cache/{}/evaluate_cache/embedding_{}_{}_{}.npy'
-                .format(self.exp_id, self.model, self.dataset, self.output_dim),
-                encoder_state.detach().cpu().numpy())
+        np.save(
+            "./libcity/cache/{}/evaluate_cache/embedding_{}_{}_{}.npy".format(
+                self.exp_id, self.model, self.dataset, self.output_dim
+            ),
+            encoder_state.detach().cpu().numpy(),
+        )
         output = self.decoder(encoder_state)  # N, feature_dim
         return output
 
@@ -133,11 +161,11 @@ class ChebConv(AbstractTrafficStateModel):
         Returns:
 
         """
-        y_true = batch['node_labels']  # N, feature_dim
+        y_true = batch["node_labels"]  # N, feature_dim
         y_predicted = self.predict(batch)  # N, feature_dim
         y_true = self._scaler.inverse_transform(y_true)
         y_predicted = self._scaler.inverse_transform(y_predicted)
-        mask = batch['mask']
+        mask = batch["mask"]
         return loss.masked_mse_torch(y_predicted[mask], y_true[mask])
 
     def predict(self, batch):

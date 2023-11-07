@@ -3,6 +3,7 @@ import math
 import numpy as np
 
 from libcity.data.dataset import TrafficStatePointDataset
+
 # from libcity.data.dataset import TrafficStateGridDataset
 from libcity.utils import ensure_dir
 
@@ -20,13 +21,14 @@ STG2SeqDataset既可以继承TrafficStatePointDataset，也可以继承TrafficSt
 
 
 class STG2SeqDataset(TrafficStatePointDataset):
-
     def __init__(self, config):
         super().__init__(config)
         self.use_row_column = False
-        self.parameters_str += '_save_adj'
-        self.cache_file_name = os.path.join('./libcity/cache/dataset_cache/',
-                                            'point_based_{}.npz'.format(self.parameters_str))
+        self.parameters_str += "_save_adj"
+        self.cache_file_name = os.path.join(
+            "./libcity/cache/dataset_cache/",
+            "point_based_{}.npz".format(self.parameters_str),
+        )
 
     def _load_rel(self):
         """
@@ -53,7 +55,9 @@ class STG2SeqDataset(TrafficStatePointDataset):
         else:  # str
             data_files = [self.data_files].copy()
         # 加载外部数据
-        if self.load_external and os.path.exists(self.data_path + self.ext_file + '.ext'):  # 外部数据集
+        if self.load_external and os.path.exists(
+            self.data_path + self.ext_file + ".ext"
+        ):  # 外部数据集
             ext_data = self._load_ext()
         else:
             ext_data = None
@@ -102,12 +106,21 @@ class STG2SeqDataset(TrafficStatePointDataset):
         # train
         x_train, y_train = x[:num_train], y[:num_train]
         # val
-        x_val, y_val = x[num_train: num_train + num_val], y[num_train: num_train + num_val]
+        x_val, y_val = (
+            x[num_train : num_train + num_val],
+            y[num_train : num_train + num_val],
+        )
         # test
         x_test, y_test = x[-num_test:], y[-num_test:]
-        self._logger.info("train\t" + "x: " + str(x_train.shape) + ", y: " + str(y_train.shape))
-        self._logger.info("eval\t" + "x: " + str(x_val.shape) + ", y: " + str(y_val.shape))
-        self._logger.info("test\t" + "x: " + str(x_test.shape) + ", y: " + str(y_test.shape))
+        self._logger.info(
+            "train\t" + "x: " + str(x_train.shape) + ", y: " + str(y_train.shape)
+        )
+        self._logger.info(
+            "eval\t" + "x: " + str(x_val.shape) + ", y: " + str(y_val.shape)
+        )
+        self._logger.info(
+            "test\t" + "x: " + str(x_test.shape) + ", y: " + str(y_test.shape)
+        )
 
         self.adj_mx = self._generate_graph_with_data(data=df, length=num_test)
         if self.cache_dataset:
@@ -120,9 +133,9 @@ class STG2SeqDataset(TrafficStatePointDataset):
                 y_test=y_test,
                 x_val=x_val,
                 y_val=y_val,
-                adj_mx=self.adj_mx
+                adj_mx=self.adj_mx,
             )
-            self._logger.info('Saved at ' + self.cache_file_name)
+            self._logger.info("Saved at " + self.cache_file_name)
         return x_train, y_train, x_val, y_val, x_test, y_test
 
     def _generate_train_val_test(self):
@@ -154,20 +167,28 @@ class STG2SeqDataset(TrafficStatePointDataset):
                 x_test: (num_samples, input_length, ..., feature_dim) \n
                 y_test: (num_samples, input_length, ..., feature_dim)
         """
-        self._logger.info('Loading ' + self.cache_file_name)
+        self._logger.info("Loading " + self.cache_file_name)
         cat_data = np.load(self.cache_file_name)
-        x_train = cat_data['x_train']
-        y_train = cat_data['y_train']
-        x_test = cat_data['x_test']
-        y_test = cat_data['y_test']
-        x_val = cat_data['x_val']
-        y_val = cat_data['y_val']
-        self.adj_mx = cat_data['adj_mx']
-        self._logger.info("train\t" + "x: " + str(x_train.shape) + ", y: " + str(y_train.shape))
-        self._logger.info("eval\t" + "x: " + str(x_val.shape) + ", y: " + str(y_val.shape))
-        self._logger.info("test\t" + "x: " + str(x_test.shape) + ", y: " + str(y_test.shape))
+        x_train = cat_data["x_train"]
+        y_train = cat_data["y_train"]
+        x_test = cat_data["x_test"]
+        y_test = cat_data["y_test"]
+        x_val = cat_data["x_val"]
+        y_val = cat_data["y_val"]
+        self.adj_mx = cat_data["adj_mx"]
+        self._logger.info(
+            "train\t" + "x: " + str(x_train.shape) + ", y: " + str(y_train.shape)
+        )
+        self._logger.info(
+            "eval\t" + "x: " + str(x_val.shape) + ", y: " + str(y_val.shape)
+        )
+        self._logger.info(
+            "test\t" + "x: " + str(x_test.shape) + ", y: " + str(y_test.shape)
+        )
         sparsity = self.adj_mx.sum() / (self.adj_mx.shape[0] * self.adj_mx.shape[1])
-        self._logger.info("Generate rel file from data, shape=" + str(self.adj_mx.shape))
+        self._logger.info(
+            "Generate rel file from data, shape=" + str(self.adj_mx.shape)
+        )
         self._logger.info("Sparsity of the adjacent matrix is: " + str(sparsity))
         return x_train, y_train, x_val, y_val, x_test, y_test
 
@@ -185,7 +206,9 @@ class STG2SeqDataset(TrafficStatePointDataset):
             else:
                 for j in range(i + 1, node_num):
                     node_j = data[-length:, j, :]
-                    distance = math.exp(-(np.abs((node_j - node_i)).sum() / length*dim))
+                    distance = math.exp(
+                        -(np.abs((node_j - node_i)).sum() / length * dim)
+                    )
                     if distance > threshold:
                         adj_mx[i, j] = 1
                         adj_mx[j, i] = 1

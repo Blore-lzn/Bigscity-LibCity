@@ -4,25 +4,25 @@ import torch
 
 # 均方误差（Mean Square Error）
 def mse(loc_pred, loc_true):
-    assert len(loc_pred) == len(loc_true), 'MSE: 预测数据与真实数据大小不一致'
+    assert len(loc_pred) == len(loc_true), "MSE: 预测数据与真实数据大小不一致"
     return np.mean(sum(pow(loc_pred - loc_true, 2)))
 
 
 # 平均绝对误差（Mean Absolute Error）
 def mae(loc_pred, loc_true):
-    assert len(loc_pred) == len(loc_true), 'MAE: 预测数据与真实数据大小不一致'
+    assert len(loc_pred) == len(loc_true), "MAE: 预测数据与真实数据大小不一致"
     return np.mean(sum(loc_pred - loc_true))
 
 
 # 均方根误差（Root Mean Square Error）
 def rmse(loc_pred, loc_true):
-    assert len(loc_pred) == len(loc_true), 'RMSE: 预测数据与真实数据大小不一致'
+    assert len(loc_pred) == len(loc_true), "RMSE: 预测数据与真实数据大小不一致"
     return np.sqrt(np.mean(sum(pow(loc_pred - loc_true, 2))))
 
 
 # 平均绝对百分比误差（Mean Absolute Percentage Error）
 def mape(loc_pred, loc_true):
-    assert len(loc_pred) == len(loc_true), 'MAPE: 预测数据与真实数据大小不一致'
+    assert len(loc_pred) == len(loc_true), "MAPE: 预测数据与真实数据大小不一致"
     assert 0 not in loc_true, "MAPE: 真实数据有0，该公式不适用"
     return np.mean(abs(loc_pred - loc_true) / loc_true)
 
@@ -36,10 +36,11 @@ def mare(loc_pred, loc_true):
 
 # 对称平均绝对百分比误差（Symmetric Mean Absolute Percentage Error）
 def smape(loc_pred, loc_true):
-    assert len(loc_pred) == len(loc_true), 'SMAPE: 预测数据与真实数据大小不一致'
+    assert len(loc_pred) == len(loc_true), "SMAPE: 预测数据与真实数据大小不一致"
     assert 0 in (loc_pred + loc_true), "SMAPE: 预测数据与真实数据有0，该公式不适用"
-    return 2.0 * np.mean(np.abs(loc_pred - loc_true) / (np.abs(loc_pred) +
-                                                        np.abs(loc_true)))
+    return 2.0 * np.mean(
+        np.abs(loc_pred - loc_true) / (np.abs(loc_pred) + np.abs(loc_true))
+    )
 
 
 # 对比真实位置与预测位置获得预测准确率
@@ -85,6 +86,7 @@ def top_k(loc_pred, loc_true, topk):
             dcg += 1.0 / np.log2(rank_index + 2)
     return hit, rank, dcg
 
+
 def Precision_torch(preds, labels, topk):
     precision = []
     for i in range(preds.shape[0]):
@@ -98,6 +100,7 @@ def Precision_torch(preds, labels, topk):
         precision.append(torch.sum(matched.flatten()).item() / topk)
     return sum(precision) / len(precision)
 
+
 def Recall_torch(preds, labels, topk):
     recall = []
     for i in range(preds.shape[0]):
@@ -109,14 +112,17 @@ def Recall_torch(preds, labels, topk):
         pred_grids = pred >= threshold
         matched = pred_grids & accident_grids
         if torch.sum(accident_grids).item() != 0:
-            recall.append(torch.sum(matched.flatten()).item() / torch.sum(accident_grids.flatten()).item())
+            recall.append(
+                torch.sum(matched.flatten()).item()
+                / torch.sum(accident_grids.flatten()).item()
+            )
     return sum(recall) / len(recall)
+
 
 def F1_Score_torch(preds, labels, topk):
     precision = Precision_torch(preds, labels, topk)
     recall = Recall_torch(preds, labels, topk)
     return 2 * precision * recall / (precision + recall)
-
 
 
 def MAP_torch(preds, labels, topk):
@@ -159,9 +165,22 @@ def PCC_torch(preds, labels, topk):
         label = sorted_label
         label_average = torch.sum(label) / (label.shape[0])
         pred_average = torch.sum(pred) / (pred.shape[0])
-        if torch.sqrt(torch.sum((label - label_average) * (label - label_average))) * torch.sqrt(
-                torch.sum((pred - pred_average) * (pred - pred_average))) != 0:
-            pcc.append((torch.sum((label - label_average) * (pred - pred_average)) / (
-                    torch.sqrt(torch.sum((label - label_average) * (label - label_average))) * torch.sqrt(
-                    torch.sum((pred - pred_average) * (pred - pred_average))))).item())
+        if (
+            torch.sqrt(torch.sum((label - label_average) * (label - label_average)))
+            * torch.sqrt(torch.sum((pred - pred_average) * (pred - pred_average)))
+            != 0
+        ):
+            pcc.append(
+                (
+                    torch.sum((label - label_average) * (pred - pred_average))
+                    / (
+                        torch.sqrt(
+                            torch.sum((label - label_average) * (label - label_average))
+                        )
+                        * torch.sqrt(
+                            torch.sum((pred - pred_average) * (pred - pred_average))
+                        )
+                    )
+                ).item()
+            )
     return sum(pcc) / len(pcc)

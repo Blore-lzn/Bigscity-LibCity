@@ -16,16 +16,21 @@ def identity_loss(y_true, y_pred):
 
 
 class CARA1(nn.Module):
-
     def hard_sigmoid(self, x):
         x = x / 6 + 0.5
         x = F.threshold(-x, -1, -1)
         x = F.threshold(-x, 0, 0)
         return x
 
-    def __init__(self, output_dim, input_dim,
-                 init='glorot_uniform', inner_init='orthogonal', device=None,
-                 **kwargs):
+    def __init__(
+        self,
+        output_dim,
+        input_dim,
+        init="glorot_uniform",
+        inner_init="orthogonal",
+        device=None,
+        **kwargs
+    ):
         super(CARA1, self).__init__()
         self.output_dim = output_dim
         self.init = init
@@ -37,9 +42,9 @@ class CARA1(nn.Module):
 
     def add_weight(self, shape, initializer):
         ts = torch.zeros(shape)
-        if initializer == 'glorot_uniform':
+        if initializer == "glorot_uniform":
             ts = nn.init.xavier_normal_(ts)
-        elif initializer == 'orthogonal':
+        elif initializer == "orthogonal":
             ts = nn.init.orthogonal_(ts)
 
         return nn.Parameter(ts)
@@ -48,48 +53,49 @@ class CARA1(nn.Module):
         # self.input_spec = [InputSpec(shape=input_shape)]
         self.input_dim = input_shape
 
-        self.W_z = self.add_weight((self.input_dim, self.output_dim),
-                                   initializer=self.init)
-        self.U_z = self.add_weight((self.output_dim, self.output_dim),
-                                   initializer=self.init)
-        self.b_z = self.add_weight((self.output_dim,),
-                                   initializer='zero')
-        self.W_r = self.add_weight((self.input_dim, self.output_dim),
-                                   initializer=self.init)
-        self.U_r = self.add_weight((self.output_dim, self.output_dim),
-                                   initializer=self.init)
-        self.b_r = self.add_weight((self.output_dim,),
-                                   initializer='zero')
-        self.W_h = self.add_weight((self.input_dim, self.output_dim),
-                                   initializer=self.init)
-        self.U_h = self.add_weight((self.output_dim, self.output_dim),
-                                   initializer=self.init)
-        self.b_h = self.add_weight((self.output_dim,),
-                                   initializer='zero')
+        self.W_z = self.add_weight(
+            (self.input_dim, self.output_dim), initializer=self.init
+        )
+        self.U_z = self.add_weight(
+            (self.output_dim, self.output_dim), initializer=self.init
+        )
+        self.b_z = self.add_weight((self.output_dim,), initializer="zero")
+        self.W_r = self.add_weight(
+            (self.input_dim, self.output_dim), initializer=self.init
+        )
+        self.U_r = self.add_weight(
+            (self.output_dim, self.output_dim), initializer=self.init
+        )
+        self.b_r = self.add_weight((self.output_dim,), initializer="zero")
+        self.W_h = self.add_weight(
+            (self.input_dim, self.output_dim), initializer=self.init
+        )
+        self.U_h = self.add_weight(
+            (self.output_dim, self.output_dim), initializer=self.init
+        )
+        self.b_h = self.add_weight((self.output_dim,), initializer="zero")
 
-        self.A_h = self.add_weight((self.output_dim, self.output_dim),
-                                   initializer=self.init)
-        self.A_u = self.add_weight((self.output_dim, self.output_dim),
-                                   initializer=self.init)
+        self.A_h = self.add_weight(
+            (self.output_dim, self.output_dim), initializer=self.init
+        )
+        self.A_u = self.add_weight(
+            (self.output_dim, self.output_dim), initializer=self.init
+        )
 
-        self.b_a_h = self.add_weight((self.output_dim,),
-                                     initializer='zero')
-        self.b_a_u = self.add_weight((self.output_dim,),
-                                     initializer='zero')
+        self.b_a_h = self.add_weight((self.output_dim,), initializer="zero")
+        self.b_a_u = self.add_weight((self.output_dim,), initializer="zero")
 
-        self.W_t = self.add_weight((self.input_dim, self.output_dim),
-                                   initializer=self.init)
-        self.U_t = self.add_weight((1, self.output_dim),
-                                   initializer=self.init)
-        self.b_t = self.add_weight((self.output_dim,),
-                                   initializer='zero')
+        self.W_t = self.add_weight(
+            (self.input_dim, self.output_dim), initializer=self.init
+        )
+        self.U_t = self.add_weight((1, self.output_dim), initializer=self.init)
+        self.b_t = self.add_weight((self.output_dim,), initializer="zero")
 
-        self.W_g = self.add_weight((self.input_dim, self.output_dim),
-                                   initializer=self.init)
-        self.U_g = self.add_weight((1, self.output_dim),
-                                   initializer=self.init)
-        self.b_g = self.add_weight((self.output_dim,),
-                                   initializer='zero')
+        self.W_g = self.add_weight(
+            (self.input_dim, self.output_dim), initializer=self.init
+        )
+        self.U_g = self.add_weight((1, self.output_dim), initializer=self.init)
+        self.b_g = self.add_weight((self.output_dim,), initializer="zero")
 
     def preprocess_input(self, x):
         return x
@@ -112,13 +118,13 @@ class CARA1(nn.Module):
         h_tm1 = states
 
         # phi_t
-        u = x[:, self.output_dim: 2 * self.output_dim]
+        u = x[:, self.output_dim : 2 * self.output_dim]
         # delta_t
-        t = x[:, 2 * self.output_dim: (2 * self.output_dim) + 1]
+        t = x[:, 2 * self.output_dim : (2 * self.output_dim) + 1]
         # delta_g
-        g = x[:, (2 * self.output_dim) + 1:]
+        g = x[:, (2 * self.output_dim) + 1 :]
         # phi_v
-        x = x[:, :self.output_dim]
+        x = x[:, : self.output_dim]
 
         t = self.inner_activation(torch.matmul(t, self.U_t))
         g = self.inner_activation(torch.matmul(g, self.U_g))
@@ -129,7 +135,11 @@ class CARA1(nn.Module):
 
         #       Contextual Attention Gate
         a = self.inner_activation(
-            torch.matmul(h_tm1, self.A_h) + torch.matmul(u, self.A_u) + self.b_a_h + self.b_a_u)
+            torch.matmul(h_tm1, self.A_h)
+            + torch.matmul(u, self.A_u)
+            + self.b_a_h
+            + self.b_a_u
+        )
 
         x_z = torch.matmul(x, self.W_z) + self.b_z
         x_r = torch.matmul(x, self.W_r) + self.b_r
@@ -161,15 +171,24 @@ def bpr_triplet_loss(x):
 
     reg = 0
 
-    loss = 1 - torch.log(torch.sigmoid(
-        torch.sum(positive_item_latent, dim=-1, keepdim=True) -
-        torch.sum(negative_item_latent, dim=-1, keepdim=True))) - reg
+    loss = (
+        1
+        - torch.log(
+            torch.sigmoid(
+                torch.sum(positive_item_latent, dim=-1, keepdim=True)
+                - torch.sum(negative_item_latent, dim=-1, keepdim=True)
+            )
+        )
+        - reg
+    )
 
     return loss
 
 
 class Recommender(nn.Module):
-    def __init__(self, num_users, num_items, num_times, latent_dim, maxvenue=5, device=None):
+    def __init__(
+        self, num_users, num_items, num_times, latent_dim, maxvenue=5, device=None
+    ):
         super(Recommender, self).__init__()
         self.maxVenue = maxvenue
         self.latent_dim = latent_dim
@@ -182,9 +201,17 @@ class Recommender(nn.Module):
         torch.nn.init.uniform_(self.V_Embedding.weight)
         torch.nn.init.uniform_(self.T_Embedding.weight)
         self.rnn = nn.Sequential(
-            CARA1(latent_dim, latent_dim, device=self.device, input_shape=(self.maxVenue, (self.latent_dim * 2) + 2,),
-                  unroll=True,
-                  ))
+            CARA1(
+                latent_dim,
+                latent_dim,
+                device=self.device,
+                input_shape=(
+                    self.maxVenue,
+                    (self.latent_dim * 2) + 2,
+                ),
+                unroll=True,
+            )
+        )
         #       latent_dim * 2 + 2 = v_embedding + t_embedding + time_gap + distance
 
     def forward(self, x):
@@ -206,9 +233,22 @@ class Recommender(nn.Module):
 
         h, w = gap_time_input.shape
         gap_time_input = gap_time_input.view(h, w, 1)
-        rnn_input = torch.cat([self.V_Embedding(checkins_input), self.T_Embedding(time_input), gap_time_input], -1)
-        neg_rnn_input = torch.cat([self.V_Embedding(neg_checkins_input), self.T_Embedding(time_input), gap_time_input],
-                                  -1)
+        rnn_input = torch.cat(
+            [
+                self.V_Embedding(checkins_input),
+                self.T_Embedding(time_input),
+                gap_time_input,
+            ],
+            -1,
+        )
+        neg_rnn_input = torch.cat(
+            [
+                self.V_Embedding(neg_checkins_input),
+                self.T_Embedding(time_input),
+                gap_time_input,
+            ],
+            -1,
+        )
         h, w = pos_distance_input.shape
         pos_distance_input = pos_distance_input.view(h, w, 1)
         h, w = neg_distance_input.shape
@@ -232,15 +272,23 @@ class Recommender(nn.Module):
         # v_latent = self.V_Embedding(torch.tensor(hist_venues))
         # t_latent = self.T_Embedding(torch.tensor(hist_times))
         u_latent = self.U_Embedding.weight[uid]
-        v_latent = self.V_Embedding.weight[hist_venues.reshape(-1)].view(hist_venues.shape[0], hist_venues.shape[1], -1)
-        t_latent = self.T_Embedding.weight[hist_times.reshape(-1)].view(hist_times.shape[0], hist_times.shape[1], -1)
+        v_latent = self.V_Embedding.weight[hist_venues.reshape(-1)].view(
+            hist_venues.shape[0], hist_venues.shape[1], -1
+        )
+        t_latent = self.T_Embedding.weight[hist_times.reshape(-1)].view(
+            hist_times.shape[0], hist_times.shape[1], -1
+        )
 
         h, w = hist_time_gap.shape
         hist_time_gap = hist_time_gap.reshape(h, w, 1)
         h, w = hist_distances.shape
         hist_distances = hist_distances.reshape(h, w, 1)
-        rnn_input = torch.cat([t_latent, torch.FloatTensor(hist_time_gap).to(self.device)], dim=-1)
-        rnn_input = torch.cat([rnn_input, torch.FloatTensor(hist_distances).to(self.device)], dim=-1)
+        rnn_input = torch.cat(
+            [t_latent, torch.FloatTensor(hist_time_gap).to(self.device)], dim=-1
+        )
+        rnn_input = torch.cat(
+            [rnn_input, torch.FloatTensor(hist_distances).to(self.device)], dim=-1
+        )
 
         rnn_input = torch.cat([v_latent, rnn_input], dim=-1)
 
@@ -255,18 +303,20 @@ class CARA(AbstractModel):
 
     def __init__(self, config, data_feature):
         super(CARA, self).__init__(config, data_feature)
-        self.loc_size = data_feature['loc_size']
-        self.tim_size = data_feature['tim_size']
-        self.uid_size = data_feature['uid_size']
-        self.id2locid = data_feature['id2locid']
+        self.loc_size = data_feature["loc_size"]
+        self.tim_size = data_feature["tim_size"]
+        self.uid_size = data_feature["uid_size"]
+        self.id2locid = data_feature["id2locid"]
         self.id2loc = []
-        self.device = config['device']
+        self.device = config["device"]
         for i in range(self.loc_size - 1):
             self.id2loc.append(self.id2locid[str(i)])
         self.id2loc.append(self.loc_size)
         self.id2loc = np.array(self.id2loc)
-        self.coor = data_feature['poi_coor']
-        self.rec = Recommender(self.uid_size, self.loc_size, self.tim_size, 10, device=self.device)
+        self.coor = data_feature["poi_coor"]
+        self.rec = Recommender(
+            self.uid_size, self.loc_size, self.tim_size, 10, device=self.device
+        )
 
     def get_time_interval(self, x):
         y = x[:, :-1]
@@ -285,7 +335,10 @@ class CARA(AbstractModel):
         ry = np.radians(y)
 
         d = x - y
-        a = np.sin(d[:, :, 0] / 2) ** 2 + np.cos(rx[:, :, 0]) * np.cos(ry[:, :, 0]) * np.sin(d[:, :, 1] / 2) ** 2
+        a = (
+            np.sin(d[:, :, 0] / 2) ** 2
+            + np.cos(rx[:, :, 0]) * np.cos(ry[:, :, 0]) * np.sin(d[:, :, 1] / 2) ** 2
+        )
         c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
         return r * c
 
@@ -297,8 +350,11 @@ class CARA(AbstractModel):
         ry = np.radians(y)
 
         d = x - y
-        a = np.sin(d[:, 0] / 2) ** 2 + np.cos(rx[:, 0]) * np.cos(ry[:, 0]) * np.sin(d[:, 1] / 2) ** 2
-        c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1-a))
+        a = (
+            np.sin(d[:, 0] / 2) ** 2
+            + np.cos(rx[:, 0]) * np.cos(ry[:, 0]) * np.sin(d[:, 1] / 2) ** 2
+        )
+        c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
         return r * c
 
     def get_distance(self, lat1, lng1, lat2, lng2):
@@ -336,18 +392,18 @@ class CARA(AbstractModel):
         return x_res, x_res_distance
 
     def forward(self, batch):
-        hloc = np.array(batch['current_loc'].cpu())[:, :5]
-        target = np.array(batch['target'].cpu())
+        hloc = np.array(batch["current_loc"].cpu())[:, :5]
+        target = np.array(batch["target"].cpu())
         h = target.shape
         target = target.reshape((*h, 1))
         hloc = np.concatenate([hloc, target], axis=1)
         hloc1 = self.id2loc[hloc]
-        tloc = np.array(batch['current_tim'].cpu())[:, :5]
-        target_tim = np.array(batch['target_tim'].cpu())
+        tloc = np.array(batch["current_tim"].cpu())[:, :5]
+        target_tim = np.array(batch["target_tim"].cpu())
         h = target_tim.shape
         target_tim = target_tim.reshape((*h, 1))
         tloc = np.concatenate([tloc, target_tim], axis=1)
-        x_users = batch['uid']
+        x_users = batch["uid"]
         t_interval = self.get_time_interval(tloc)
 
         titude = []
@@ -355,20 +411,27 @@ class CARA(AbstractModel):
             titude.append(self.coor[str(i)])
         titude = np.array(titude).reshape((hloc.shape[0], hloc.shape[1], 2))
         pos_distance = self.get_pos_distance(titude)
-        x_neg_checkins, x_neg_distance = self.get_neg_checkins(np.array(batch['current_loc'].cpu()), hloc, pos_distance)
+        x_neg_checkins, x_neg_distance = self.get_neg_checkins(
+            np.array(batch["current_loc"].cpu()), hloc, pos_distance
+        )
         x_neg_checkins = np.array(x_neg_checkins)
-        x = [x_users, torch.tensor(tloc).to(self.device),
-             torch.FloatTensor(t_interval).to(self.device), torch.FloatTensor(pos_distance).to(self.device),
-             torch.FloatTensor(x_neg_distance).to(self.device), torch.tensor(hloc).to(self.device),
-             torch.tensor(x_neg_checkins).to(self.device)]
+        x = [
+            x_users,
+            torch.tensor(tloc).to(self.device),
+            torch.FloatTensor(t_interval).to(self.device),
+            torch.FloatTensor(pos_distance).to(self.device),
+            torch.FloatTensor(x_neg_distance).to(self.device),
+            torch.tensor(hloc).to(self.device),
+            torch.tensor(x_neg_checkins).to(self.device),
+        ]
         return self.rec(x)
 
     def predict(self, batch):
-        hloc = np.array(batch['current_loc'].cpu())[:, :5]
-        tloc = np.array(batch['current_tim'].cpu())[:, :5]
-        x_users = batch['uid']
-        my_true = batch['target']
-        my_true_tim = batch['target_tim']
+        hloc = np.array(batch["current_loc"].cpu())[:, :5]
+        tloc = np.array(batch["current_tim"].cpu())[:, :5]
+        x_users = batch["uid"]
+        my_true = batch["target"]
+        my_true_tim = batch["target_tim"]
         output = []
         for id, mloc in enumerate(hloc):
             hlocs = []
@@ -409,8 +472,18 @@ class CARA(AbstractModel):
                 users.append(mu.item())
                 t_intervals.append(mi)
                 distances.append(md)
-            output.append(self.rec.rank(np.array(users), np.array(hlocs), np.array(tlocs), np.array(t_intervals),
-                                        np.array(distances)).cpu().detach().numpy())
+            output.append(
+                self.rec.rank(
+                    np.array(users),
+                    np.array(hlocs),
+                    np.array(tlocs),
+                    np.array(t_intervals),
+                    np.array(distances),
+                )
+                .cpu()
+                .detach()
+                .numpy()
+            )
         output = np.array(output)
         return torch.tensor(output).to(self.device)
 

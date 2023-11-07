@@ -2,27 +2,40 @@ import os
 import pandas as pd
 import numpy as np
 import math
-from libcity.data.dataset.trajectory_encoder.abstract_trajectory_encoder import AbstractTrajectoryEncoder
+from libcity.data.dataset.trajectory_encoder.abstract_trajectory_encoder import (
+    AbstractTrajectoryEncoder,
+)
 from libcity.utils import parse_time
 from libcity.utils.dataset import parse_coordinate
 from collections import defaultdict
 
-parameter_list = ['dataset', 'min_session_len', 'min_sessions', 'traj_encoder', 'window_size', 'min_checkins',
-                  'max_session_len']
+parameter_list = [
+    "dataset",
+    "min_session_len",
+    "min_sessions",
+    "traj_encoder",
+    "window_size",
+    "min_checkins",
+    "max_session_len",
+]
 
 
 def geodistance(lat1, lng1, lat2, lng2):
-    lng1, lat1, lng2, lat2 = map(math.radians, [float(lng1), float(lat1), float(lng2), float(lat2)])
-    dlon = lng2-lng1
-    dlat = lat2-lat1
-    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
-    distance = 2*math.asin(math.sqrt(a))*6371*1000
-    distance = round(distance/1000, 3)
+    lng1, lat1, lng2, lat2 = map(
+        math.radians, [float(lng1), float(lat1), float(lng2), float(lat2)]
+    )
+    dlon = lng2 - lng1
+    dlat = lat2 - lat1
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    )
+    distance = 2 * math.asin(math.sqrt(a)) * 6371 * 1000
+    distance = round(distance / 1000, 3)
     return distance
 
 
 class LstpmEncoder(AbstractTrajectoryEncoder):
-
     def __init__(self, config):
         super().__init__(config)
         self.uid = 0
@@ -30,22 +43,32 @@ class LstpmEncoder(AbstractTrajectoryEncoder):
         self.id2location = {}
         self.loc_id = 0
         self.tim_max = 47  # LSTPM 做的是 48 个 time slot
-        self.feature_dict = {'history_loc': 'array of int', 'history_tim': 'array of int',
-                             'current_loc': 'int', 'current_tim': 'int', 'dilated_rnn_input_index': 'no_pad_int',
-                             'history_avg_distance': 'no_pad_float',
-                             'target': 'int', 'uid': 'int'}
-        if config['evaluate_method'] == 'sample':
-            self.feature_dict['neg_loc'] = 'int'
-            parameter_list.append('neg_samples')
-        parameters_str = ''
+        self.feature_dict = {
+            "history_loc": "array of int",
+            "history_tim": "array of int",
+            "current_loc": "int",
+            "current_tim": "int",
+            "dilated_rnn_input_index": "no_pad_int",
+            "history_avg_distance": "no_pad_float",
+            "target": "int",
+            "uid": "int",
+        }
+        if config["evaluate_method"] == "sample":
+            self.feature_dict["neg_loc"] = "int"
+            parameter_list.append("neg_samples")
+        parameters_str = ""
         for key in parameter_list:
             if key in self.config:
-                parameters_str += '_' + str(self.config[key])
+                parameters_str += "_" + str(self.config[key])
         self.cache_file_name = os.path.join(
-            './libcity/cache/dataset_cache/', 'trajectory_{}.json'.format(parameters_str))
-        self.dataset = self.config.get('dataset', '')
-        self.geo_file = self.config.get('geo_file', self.dataset)
-        self.poi_profile = pd.read_csv('./raw_data/{}/{}.geo'.format(self.dataset, self.geo_file))
+            "./libcity/cache/dataset_cache/",
+            "trajectory_{}.json".format(parameters_str),
+        )
+        self.dataset = self.config.get("dataset", "")
+        self.geo_file = self.config.get("geo_file", self.dataset)
+        self.poi_profile = pd.read_csv(
+            "./raw_data/{}/{}.geo".format(self.dataset, self.geo_file)
+        )
         self.time_checkin_set = defaultdict(set)
 
     def encode(self, uid, trajectories, negative_sample=None):
@@ -93,8 +116,11 @@ class LstpmEncoder(AbstractTrajectoryEncoder):
                 lon = []
                 lat = []
                 for poi in current_loc:
-                    lon_cur, lat_cur = parse_coordinate(self.poi_profile.loc[self.poi_profile['geo_id']
-                                                        == self.id2location[poi]].iloc[0]['coordinates'])
+                    lon_cur, lat_cur = parse_coordinate(
+                        self.poi_profile.loc[
+                            self.poi_profile["geo_id"] == self.id2location[poi]
+                        ].iloc[0]["coordinates"]
+                    )
                     lon.append(lon_cur)
                     lat.append(lat_cur)
                 history_loc_central.append((np.mean(lat), np.mean(lon)))
@@ -102,13 +128,17 @@ class LstpmEncoder(AbstractTrajectoryEncoder):
             # 一条轨迹可以生成多个数据点
             for i in range(len(current_loc) - 1):
                 trace = []
-                target = current_loc[i+1]
-                dilated_rnn_input_index = self._create_dilated_rnn_input(current_loc[:i+1])
-                history_avg_distance = self._gen_distance_matrix(current_loc[:i+1], history_loc_central)
+                target = current_loc[i + 1]
+                dilated_rnn_input_index = self._create_dilated_rnn_input(
+                    current_loc[: i + 1]
+                )
+                history_avg_distance = self._gen_distance_matrix(
+                    current_loc[: i + 1], history_loc_central
+                )
                 trace.append(history_loc.copy())
                 trace.append(history_tim.copy())
-                trace.append(current_loc[:i+1])
-                trace.append(current_tim[:i+1])
+                trace.append(current_loc[: i + 1])
+                trace.append(current_tim[: i + 1])
                 trace.append(dilated_rnn_input_index)
                 trace.append(history_avg_distance)
                 trace.append(target)
@@ -128,8 +158,11 @@ class LstpmEncoder(AbstractTrajectoryEncoder):
             lon = []
             lat = []
             for poi in current_loc:
-                lon_cur, lat_cur = parse_coordinate(self.poi_profile.loc[self.poi_profile['geo_id']
-                                                    == self.id2location[poi]].iloc[0]['coordinates'])
+                lon_cur, lat_cur = parse_coordinate(
+                    self.poi_profile.loc[
+                        self.poi_profile["geo_id"] == self.id2location[poi]
+                    ].iloc[0]["coordinates"]
+                )
                 lon.append(lon_cur)
                 lat.append(lat_cur)
             history_loc_central.append((np.mean(lat), np.mean(lon)))
@@ -138,16 +171,13 @@ class LstpmEncoder(AbstractTrajectoryEncoder):
     def gen_data_feature(self):
         loc_pad = self.loc_id
         tim_pad = self.tim_max + 1
-        self.pad_item = {
-            'current_loc': loc_pad,
-            'current_tim': tim_pad
-        }
+        self.pad_item = {"current_loc": loc_pad, "current_tim": tim_pad}
         # generate time_sim_matrix
         # the pad time will not appear here
-        sim_matrix = np.zeros((self.tim_max+1, self.tim_max+1))
-        for i in range(self.tim_max+1):
+        sim_matrix = np.zeros((self.tim_max + 1, self.tim_max + 1))
+        for i in range(self.tim_max + 1):
             sim_matrix[i][i] = 1
-            for j in range(i+1, self.tim_max+1):
+            for j in range(i + 1, self.tim_max + 1):
                 set_i = self.time_checkin_set[i]
                 set_j = self.time_checkin_set[j]
                 if len(set_i | set_j) != 0:
@@ -155,12 +185,12 @@ class LstpmEncoder(AbstractTrajectoryEncoder):
                     sim_matrix[i][j] = jaccard_ij
                     sim_matrix[j][i] = jaccard_ij
         self.data_feature = {
-            'loc_size': self.loc_id + 1,
-            'tim_size': self.tim_max + 2,
-            'uid_size': self.uid,
-            'loc_pad': loc_pad,
-            'tim_pad': tim_pad,
-            'tim_sim_matrix': sim_matrix.tolist()
+            "loc_size": self.loc_id + 1,
+            "tim_size": self.tim_max + 2,
+            "uid_size": self.uid,
+            "loc_pad": loc_pad,
+            "tim_pad": tim_pad,
+            "tim_sim_matrix": sim_matrix.tolist(),
         }
 
     def _create_dilated_rnn_input(self, current_loc):
@@ -169,18 +199,24 @@ class LstpmEncoder(AbstractTrajectoryEncoder):
         session_dilated_rnn_input_index = [0] * sequence_length
         for i in range(sequence_length - 1):
             current_poi = current_loc[i]
-            poi_before = current_loc[i + 1:]
-            current_poi_profile = self.poi_profile.loc[self.poi_profile['geo_id']
-                                                       == self.id2location[current_poi]].iloc[0]
-            lon_cur, lat_cur = parse_coordinate(current_poi_profile['coordinates'])
+            poi_before = current_loc[i + 1 :]
+            current_poi_profile = self.poi_profile.loc[
+                self.poi_profile["geo_id"] == self.id2location[current_poi]
+            ].iloc[0]
+            lon_cur, lat_cur = parse_coordinate(current_poi_profile["coordinates"])
             distance_row_explicit = []
             for target in poi_before:
-                lon, lat = parse_coordinate(self.poi_profile.loc[self.poi_profile['geo_id']
-                                            == self.id2location[target]].iloc[0]['coordinates'])
+                lon, lat = parse_coordinate(
+                    self.poi_profile.loc[
+                        self.poi_profile["geo_id"] == self.id2location[target]
+                    ].iloc[0]["coordinates"]
+                )
                 distance_row_explicit.append(geodistance(lat_cur, lon_cur, lat, lon))
             index_closet = np.argmin(distance_row_explicit).item()
             # reverse back
-            session_dilated_rnn_input_index[sequence_length - i - 1] = sequence_length - 2 - index_closet - i
+            session_dilated_rnn_input_index[sequence_length - i - 1] = (
+                sequence_length - 2 - index_closet - i
+            )
         current_loc.reverse()
         return session_dilated_rnn_input_index
 
@@ -188,8 +224,11 @@ class LstpmEncoder(AbstractTrajectoryEncoder):
         # 使用 profile 计算当前位置与历史轨迹中心点之间的距离
         history_avg_distance = []  # history_session_count
         now_loc = current_loc[-1]
-        lon_cur, lat_cur = parse_coordinate(self.poi_profile.loc[self.poi_profile['geo_id']
-                                            == self.id2location[now_loc]].iloc[0]['coordinates'])
+        lon_cur, lat_cur = parse_coordinate(
+            self.poi_profile.loc[
+                self.poi_profile["geo_id"] == self.id2location[now_loc]
+            ].iloc[0]["coordinates"]
+        )
         for central in history_loc_central:
             dis = geodistance(central[0], central[1], lat_cur, lon_cur)
             if dis < 1:

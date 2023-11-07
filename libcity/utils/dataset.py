@@ -11,7 +11,7 @@ def parse_time(time_in, timezone_offset_in_minute=0):
     """
     将 json 中 time_format 格式的 time 转化为 local datatime
     """
-    date = datetime.strptime(time_in, '%Y-%m-%dT%H:%M:%SZ')  # 这是 UTC 时间
+    date = datetime.strptime(time_in, "%Y-%m-%dT%H:%M:%SZ")  # 这是 UTC 时间
     return date + timedelta(minutes=timezone_offset_in_minute)
 
 
@@ -23,22 +23,28 @@ def cal_basetime(start_time, base_zero):
     选取 base_time 来做的理由是：这样可以保证同一个小时段总是被 encode 成同一个数
     """
     if base_zero:
-        return start_time - timedelta(hours=start_time.hour,
-                                      minutes=start_time.minute,
-                                      seconds=start_time.second,
-                                      microseconds=start_time.microsecond)
+        return start_time - timedelta(
+            hours=start_time.hour,
+            minutes=start_time.minute,
+            seconds=start_time.second,
+            microseconds=start_time.microsecond,
+        )
     else:
         # time length = 12
         if start_time.hour < 12:
-            return start_time - timedelta(hours=start_time.hour,
-                                          minutes=start_time.minute,
-                                          seconds=start_time.second,
-                                          microseconds=start_time.microsecond)
+            return start_time - timedelta(
+                hours=start_time.hour,
+                minutes=start_time.minute,
+                seconds=start_time.second,
+                microseconds=start_time.microsecond,
+            )
         else:
-            return start_time - timedelta(hours=start_time.hour - 12,
-                                          minutes=start_time.minute,
-                                          seconds=start_time.second,
-                                          microseconds=start_time.microsecond)
+            return start_time - timedelta(
+                hours=start_time.hour - 12,
+                minutes=start_time.minute,
+                seconds=start_time.second,
+                microseconds=start_time.microsecond,
+            )
 
 
 def cal_timeoff(now_time, base_time):
@@ -52,8 +58,8 @@ def cal_timeoff(now_time, base_time):
 
 def caculate_time_sim(data):
     time_checkin_set = defaultdict(set)
-    tim_size = data['tim_size']
-    data_neural = data['data']
+    tim_size = data["tim_size"]
+    data_neural = data["data"]
     for uid in data_neural:
         uid_sessions = data_neural[uid]
         for session in uid_sessions:
@@ -75,16 +81,16 @@ def caculate_time_sim(data):
 
 
 def parse_coordinate(coordinate):
-    items = coordinate[1:-1].split(',')
+    items = coordinate[1:-1].split(",")
     return float(items[0]), float(items[1])
 
 
 def string2timestamp(strings, offset_frame):
     ts = []
     for t in strings:
-        dtstr = '-'.join([t[:4].decode(), t[4:6].decode(), t[6:8].decode()])
+        dtstr = "-".join([t[:4].decode(), t[4:6].decode(), t[6:8].decode()])
         slot = int(t[8:]) - 1
-        ts.append(np.datetime64(dtstr, 'm') + slot * offset_frame)
+        ts.append(np.datetime64(dtstr, "m") + slot * offset_frame)
     return ts  # [numpy.datetime64('2014-01-01T00:00'), ...]
 
 
@@ -100,10 +106,9 @@ def timestamp2array(timestamps, t):
     Returns:
         np.ndarray: 特征数组，shape: (len(timestamps), ext_dim)
     """
-    vec_wday = [time.strptime(
-        str(t)[:10], '%Y-%m-%d').tm_wday for t in timestamps]
-    vec_hour = [time.strptime(str(t)[11:13], '%H').tm_hour for t in timestamps]
-    vec_minu = [time.strptime(str(t)[14:16], '%M').tm_min for t in timestamps]
+    vec_wday = [time.strptime(str(t)[:10], "%Y-%m-%d").tm_wday for t in timestamps]
+    vec_hour = [time.strptime(str(t)[11:13], "%H").tm_hour for t in timestamps]
+    vec_minu = [time.strptime(str(t)[14:16], "%M").tm_min for t in timestamps]
     ret = []
     for idx, wday in enumerate(vec_wday):
         # day
@@ -141,7 +146,7 @@ def timestamp2vec_origin(timestamps):
     Returns:
         np.ndarray: 特征数组，shape: (len(timestamps), 8)
     """
-    vec = [time.strptime(str(t)[:10], '%Y-%m-%d').tm_wday for t in timestamps]
+    vec = [time.strptime(str(t)[:10], "%Y-%m-%d").tm_wday for t in timestamps]
     ret = []
     for i in vec:
         v = [0 for _ in range(7)]

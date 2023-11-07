@@ -26,9 +26,15 @@ class SSelfAttention(nn.Module):
     def forward(self, values, keys, query):
         batch_size, num_nodes, input_window, embed_dim = query.shape
 
-        values = values.reshape(batch_size, num_nodes, input_window, self.num_heads, self.head_dim)
-        keys = keys.reshape(batch_size, num_nodes, input_window, self.num_heads, self.head_dim)
-        query = query.reshape(batch_size, num_nodes, input_window, self.num_heads, self.head_dim)
+        values = values.reshape(
+            batch_size, num_nodes, input_window, self.num_heads, self.head_dim
+        )
+        keys = keys.reshape(
+            batch_size, num_nodes, input_window, self.num_heads, self.head_dim
+        )
+        query = query.reshape(
+            batch_size, num_nodes, input_window, self.num_heads, self.head_dim
+        )
 
         values = self.values(values)
         keys = self.keys(keys)
@@ -66,9 +72,15 @@ class TSelfAttention(nn.Module):
     def forward(self, values, keys, query):
         batch_size, num_nodes, input_window, embed_dim = query.shape
 
-        values = values.reshape(batch_size, num_nodes, input_window, self.num_heads, self.head_dim)
-        keys = keys.reshape(batch_size, num_nodes, input_window, self.num_heads, self.head_dim)
-        query = query.reshape(batch_size, num_nodes, input_window, self.num_heads, self.head_dim)
+        values = values.reshape(
+            batch_size, num_nodes, input_window, self.num_heads, self.head_dim
+        )
+        keys = keys.reshape(
+            batch_size, num_nodes, input_window, self.num_heads, self.head_dim
+        )
+        query = query.reshape(
+            batch_size, num_nodes, input_window, self.num_heads, self.head_dim
+        )
 
         values = self.values(values)
         keys = self.keys(keys)
@@ -88,19 +100,23 @@ class TSelfAttention(nn.Module):
 
 
 class GraphConvolution(nn.Module):
-    def __init__(self, in_features, out_features, bias=True, device=torch.device('cpu')):
+    def __init__(
+        self, in_features, out_features, bias=True, device=torch.device("cpu")
+    ):
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.weight = nn.Parameter(torch.FloatTensor(in_features, out_features).to(device))
+        self.weight = nn.Parameter(
+            torch.FloatTensor(in_features, out_features).to(device)
+        )
         if bias:
             self.bias = nn.Parameter(torch.FloatTensor(out_features).to(device))
         else:
-            self.register_parameter('bias', None)
+            self.register_parameter("bias", None)
         self.reset_parameters()
 
     def reset_parameters(self):
-        stdv = 1. / math.sqrt(self.weight.size(1))
+        stdv = 1.0 / math.sqrt(self.weight.size(1))
         self.weight.data.uniform_(-stdv, stdv)
         if self.bias is not None:
             self.bias.data.uniform_(-stdv, stdv)
@@ -114,13 +130,18 @@ class GraphConvolution(nn.Module):
             return output
 
     def __repr__(self):
-        return self.__class__.__name__ + ' (' \
-               + str(self.in_features) + ' -> ' \
-               + str(self.out_features) + ')'
+        return (
+            self.__class__.__name__
+            + " ("
+            + str(self.in_features)
+            + " -> "
+            + str(self.out_features)
+            + ")"
+        )
 
 
 class GCN(nn.Module):
-    def __init__(self, nfeat, nhid, nclass, dropout_rate=0, device=torch.device('cpu')):
+    def __init__(self, nfeat, nhid, nclass, dropout_rate=0, device=torch.device("cpu")):
         super().__init__()
         self.gc1 = GraphConvolution(nfeat, nhid, device=device)
         self.gc2 = GraphConvolution(nhid, nclass, device=device)
@@ -134,8 +155,15 @@ class GCN(nn.Module):
 
 
 class STransformer(nn.Module):
-    def __init__(self, adj_mx, embed_dim=64, num_heads=2,
-                 forward_expansion=4, dropout_rate=0, device=torch.device('cpu')):
+    def __init__(
+        self,
+        adj_mx,
+        embed_dim=64,
+        num_heads=2,
+        forward_expansion=4,
+        dropout_rate=0,
+        device=torch.device("cpu"),
+    ):
         super().__init__()
         self.device = device
         self.adj_mx = torch.FloatTensor(adj_mx).to(device)
@@ -165,7 +193,9 @@ class STransformer(nn.Module):
         D_S = D_S.expand(batch_size, input_windows, num_nodes, embed_dim)
         D_S = D_S.permute(0, 2, 1, 3)
 
-        X_G = torch.Tensor(query.shape[0], query.shape[1], 0, query.shape[3]).to(self.device)
+        X_G = torch.Tensor(query.shape[0], query.shape[1], 0, query.shape[3]).to(
+            self.device
+        )
         self.adj_mx = self.adj_mx.unsqueeze(0).unsqueeze(0)
         self.adj_mx = self.norm_adj(self.adj_mx)
         self.adj_mx = self.adj_mx.squeeze(0).squeeze(0)
@@ -189,8 +219,15 @@ class STransformer(nn.Module):
 
 
 class TTransformer(nn.Module):
-    def __init__(self, TG_per_day=228, embed_dim=64, num_heads=2,
-                 forward_expansion=4, dropout_rate=0, device=torch.device('cpu')):
+    def __init__(
+        self,
+        TG_per_day=228,
+        embed_dim=64,
+        num_heads=2,
+        forward_expansion=4,
+        dropout_rate=0,
+        device=torch.device("cpu"),
+    ):
         super().__init__()
         self.device = device
         self.temporal_embedding = nn.Embedding(TG_per_day, embed_dim)
@@ -224,15 +261,33 @@ class TTransformer(nn.Module):
 
 
 class STTransformerBlock(nn.Module):
-    def __init__(self, adj_mx, embed_dim=64, num_heads=2, TG_per_day=288,
-                 forward_expansion=4, dropout_rate=0, device=torch.device('cpu')):
+    def __init__(
+        self,
+        adj_mx,
+        embed_dim=64,
+        num_heads=2,
+        TG_per_day=288,
+        forward_expansion=4,
+        dropout_rate=0,
+        device=torch.device("cpu"),
+    ):
         super().__init__()
         self.STransformer = STransformer(
-            adj_mx, embed_dim=embed_dim, num_heads=num_heads,
-            forward_expansion=forward_expansion, dropout_rate=dropout_rate, device=device)
+            adj_mx,
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            forward_expansion=forward_expansion,
+            dropout_rate=dropout_rate,
+            device=device,
+        )
         self.TTransformer = TTransformer(
-            TG_per_day=TG_per_day, embed_dim=embed_dim, num_heads=num_heads,
-            forward_expansion=forward_expansion, dropout_rate=dropout_rate, device=device)
+            TG_per_day=TG_per_day,
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            forward_expansion=forward_expansion,
+            dropout_rate=dropout_rate,
+            device=device,
+        )
         self.norm1 = nn.LayerNorm(embed_dim)
         self.norm2 = nn.LayerNorm(embed_dim)
         self.dropout_layer = nn.Dropout(dropout_rate)
@@ -244,16 +299,32 @@ class STTransformerBlock(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, adj_mx, embed_dim=64, num_layers=3, num_heads=2, TG_per_day=288,
-                 forward_expansion=4, dropout_rate=0, device=torch.device('cpu')):
+    def __init__(
+        self,
+        adj_mx,
+        embed_dim=64,
+        num_layers=3,
+        num_heads=2,
+        TG_per_day=288,
+        forward_expansion=4,
+        dropout_rate=0,
+        device=torch.device("cpu"),
+    ):
         super().__init__()
-        self.layers = nn.ModuleList([
-            STTransformerBlock(
-                adj_mx, embed_dim=embed_dim, num_heads=num_heads, TG_per_day=TG_per_day,
-                forward_expansion=forward_expansion, dropout_rate=dropout_rate, device=device
-            )
-            for _ in range(num_layers)
-        ])
+        self.layers = nn.ModuleList(
+            [
+                STTransformerBlock(
+                    adj_mx,
+                    embed_dim=embed_dim,
+                    num_heads=num_heads,
+                    TG_per_day=TG_per_day,
+                    forward_expansion=forward_expansion,
+                    dropout_rate=dropout_rate,
+                    device=device,
+                )
+                for _ in range(num_layers)
+            ]
+        )
         self.dropout_layer = nn.Dropout(dropout_rate)
 
     def forward(self, x):
@@ -264,12 +335,27 @@ class Encoder(nn.Module):
 
 
 class Transformer(nn.Module):
-    def __init__(self, adj_mx, embed_dim=64, num_layers=3, num_heads=2, TG_per_day=288,
-                 forward_expansion=4, dropout_rate=0, device=torch.device('cpu')):
+    def __init__(
+        self,
+        adj_mx,
+        embed_dim=64,
+        num_layers=3,
+        num_heads=2,
+        TG_per_day=288,
+        forward_expansion=4,
+        dropout_rate=0,
+        device=torch.device("cpu"),
+    ):
         super().__init__()
         self.encoder = Encoder(
-            adj_mx, embed_dim=embed_dim, num_layers=num_layers, num_heads=num_heads, TG_per_day=TG_per_day,
-            forward_expansion=forward_expansion, dropout_rate=dropout_rate, device=device,
+            adj_mx,
+            embed_dim=embed_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            TG_per_day=TG_per_day,
+            forward_expansion=forward_expansion,
+            dropout_rate=dropout_rate,
+            device=device,
         )
 
     def forward(self, src):
@@ -281,32 +367,39 @@ class STTN(AbstractTrafficStateModel):
     def __init__(self, config, data_feature):
         super().__init__(config, data_feature)
 
-        self._scaler = self.data_feature.get('scaler')
-        self.adj_mx = self.data_feature.get('adj_mx', 1)
+        self._scaler = self.data_feature.get("scaler")
+        self.adj_mx = self.data_feature.get("adj_mx", 1)
         # self.num_nodes = self.data_feature.get('num_nodes', 1)
-        self.feature_dim = self.data_feature.get('feature_dim', 1)
-        self.output_dim = self.data_feature.get('output_dim', 1)
+        self.feature_dim = self.data_feature.get("feature_dim", 1)
+        self.output_dim = self.data_feature.get("output_dim", 1)
         # self.len_row = self.data_feature.get('len_row', 1)
         # self.len_column = self.data_feature.get('len_column', 1)
 
         self._logger = getLogger()
 
-        self.device = config.get('device', torch.device('cpu'))
+        self.device = config.get("device", torch.device("cpu"))
 
-        self.embed_dim = config.get('embed_dim', 64)
-        self.num_layers = config.get('num_layers', 3)
-        self.num_heads = config.get('num_heads', 2)
-        self.TG_per_day = config.get('TG_in_one_day', 288)  # number of time intevals per day
-        self.forward_expansion = config.get('forward_expansion', 4)
-        self.dropout_rate = config.get('dropout_rate', 0)
+        self.embed_dim = config.get("embed_dim", 64)
+        self.num_layers = config.get("num_layers", 3)
+        self.num_heads = config.get("num_heads", 2)
+        self.TG_per_day = config.get(
+            "TG_in_one_day", 288
+        )  # number of time intevals per day
+        self.forward_expansion = config.get("forward_expansion", 4)
+        self.dropout_rate = config.get("dropout_rate", 0)
 
-        self.input_window = config.get('input_window', 1)
-        self.output_window = config.get('output_window', 1)
+        self.input_window = config.get("input_window", 1)
+        self.output_window = config.get("output_window", 1)
 
         self.conv1 = nn.Conv2d(self.feature_dim, self.embed_dim, 1)
         self.transformer = Transformer(
-            self.adj_mx, embed_dim=self.embed_dim, num_layers=self.num_layers, num_heads=self.num_heads,
-            TG_per_day=self.TG_per_day, forward_expansion=self.forward_expansion, dropout_rate=self.dropout_rate,
+            self.adj_mx,
+            embed_dim=self.embed_dim,
+            num_layers=self.num_layers,
+            num_heads=self.num_heads,
+            TG_per_day=self.TG_per_day,
+            forward_expansion=self.forward_expansion,
+            dropout_rate=self.dropout_rate,
             device=self.device,
         )
         self.conv2 = nn.Conv2d(self.input_window, self.output_window, 1)
@@ -314,7 +407,7 @@ class STTN(AbstractTrafficStateModel):
         self.act_layer = nn.ReLU()
 
     def forward(self, batch):
-        inputs = batch['X']
+        inputs = batch["X"]
         inputs = inputs.permute(0, 3, 2, 1)
         input_transformer = self.conv1(inputs)
         input_transformer = input_transformer.permute(0, 2, 3, 1)
@@ -329,10 +422,12 @@ class STTN(AbstractTrafficStateModel):
         return out
 
     def calculate_loss(self, batch):
-        y_true = batch['y']
+        y_true = batch["y"]
         y_predicted = self.predict(batch)
-        y_true = self._scaler.inverse_transform(y_true[..., :self.output_dim])
-        y_predicted = self._scaler.inverse_transform(y_predicted[..., :self.output_dim])
+        y_true = self._scaler.inverse_transform(y_true[..., : self.output_dim])
+        y_predicted = self._scaler.inverse_transform(
+            y_predicted[..., : self.output_dim]
+        )
         return loss.masked_mae_torch(y_predicted, y_true)
 
     def predict(self, batch):

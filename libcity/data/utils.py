@@ -18,19 +18,29 @@ def get_dataset(config):
         AbstractDataset: the loaded dataset
     """
     try:
-        return getattr(importlib.import_module('libcity.data.dataset'),
-                       config['dataset_class'])(config)
+        return getattr(
+            importlib.import_module("libcity.data.dataset"), config["dataset_class"]
+        )(config)
     except AttributeError:
         try:
-            return getattr(importlib.import_module('libcity.data.dataset.dataset_subclass'),
-                           config['dataset_class'])(config)
+            return getattr(
+                importlib.import_module("libcity.data.dataset.dataset_subclass"),
+                config["dataset_class"],
+            )(config)
         except AttributeError:
-            raise AttributeError('dataset_class is not found')
+            raise AttributeError("dataset_class is not found")
 
 
-def generate_dataloader(train_data, eval_data, test_data, feature_name,
-                        batch_size, num_workers, shuffle=True,
-                        pad_with_last_sample=False):
+def generate_dataloader(
+    train_data,
+    eval_data,
+    test_data,
+    feature_name,
+    batch_size,
+    num_workers,
+    shuffle=True,
+    pad_with_last_sample=False,
+):
     """
     create dataloader(train/test/eval)
 
@@ -71,21 +81,41 @@ def generate_dataloader(train_data, eval_data, test_data, feature_name,
             batch.append(copy.deepcopy(item))
         return batch
 
-    train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size,
-                                  num_workers=num_workers, collate_fn=collator,
-                                  shuffle=shuffle)
-    eval_dataloader = DataLoader(dataset=eval_dataset, batch_size=batch_size,
-                                 num_workers=num_workers, collate_fn=collator,
-                                 shuffle=shuffle)
-    test_dataloader = DataLoader(dataset=test_dataset, batch_size=batch_size,
-                                 num_workers=num_workers, collate_fn=collator,
-                                 shuffle=False)
+    train_dataloader = DataLoader(
+        dataset=train_dataset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        collate_fn=collator,
+        shuffle=shuffle,
+    )
+    eval_dataloader = DataLoader(
+        dataset=eval_dataset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        collate_fn=collator,
+        shuffle=shuffle,
+    )
+    test_dataloader = DataLoader(
+        dataset=test_dataset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        collate_fn=collator,
+        shuffle=False,
+    )
     return train_dataloader, eval_dataloader, test_dataloader
 
 
-def generate_dataloader_pad(train_data, eval_data, test_data, feature_name,
-                            batch_size, num_workers, pad_item=None,
-                            pad_max_len=None, shuffle=True):
+def generate_dataloader_pad(
+    train_data,
+    eval_data,
+    test_data,
+    feature_name,
+    batch_size,
+    num_workers,
+    pad_item=None,
+    pad_max_len=None,
+    shuffle=True,
+):
     """
     create dataloader(train/test/eval)
 
@@ -117,13 +147,25 @@ def generate_dataloader_pad(train_data, eval_data, test_data, feature_name,
         batch.padding()
         return batch
 
-    train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size,
-                                  num_workers=num_workers, collate_fn=collator,
-                                  shuffle=shuffle)
-    eval_dataloader = DataLoader(dataset=eval_dataset, batch_size=batch_size,
-                                 num_workers=num_workers, collate_fn=collator,
-                                 shuffle=shuffle)
-    test_dataloader = DataLoader(dataset=test_dataset, batch_size=batch_size,
-                                 num_workers=num_workers, collate_fn=collator,
-                                 shuffle=shuffle)
+    train_dataloader = DataLoader(
+        dataset=train_dataset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        collate_fn=collator,
+        shuffle=shuffle,
+    )
+    eval_dataloader = DataLoader(
+        dataset=eval_dataset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        collate_fn=collator,
+        shuffle=shuffle,
+    )
+    test_dataloader = DataLoader(
+        dataset=test_dataset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        collate_fn=collator,
+        shuffle=shuffle,
+    )
     return train_dataloader, eval_dataloader, test_dataloader

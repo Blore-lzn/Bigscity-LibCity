@@ -1,5 +1,4 @@
 class AbstractTraditionModel:
-
     def __init__(self, config, data_feature):
         self.data_feature = data_feature
 

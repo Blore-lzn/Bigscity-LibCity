@@ -8,8 +8,10 @@ from libcity.data.dataset import TrafficStateDataset
 class TrafficStateOdDataset(TrafficStateDataset):
     def __init__(self, config):
         super().__init__(config)
-        self.cache_file_name = os.path.join('./libcity/cache/dataset_cache/',
-                                            'od_based_{}.npz'.format(self.parameters_str))
+        self.cache_file_name = os.path.join(
+            "./libcity/cache/dataset_cache/",
+            "od_based_{}.npz".format(self.parameters_str),
+        )
         self._load_rel()  # don't care whether there is a .rel file
 
     def _load_dyna(self, filename):
@@ -50,6 +52,12 @@ class TrafficStateOdDataset(TrafficStateDataset):
         Returns:
             dict: 包含数据集的相关特征的字典
         """
-        return {"scaler": self.scaler, "adj_mx": self.adj_mx,
-                "num_nodes": self.num_nodes, "feature_dim": self.feature_dim, "ext_dim": self.ext_dim,
-                "output_dim": self.output_dim, "num_batches": self.num_batches}
+        return {
+            "scaler": self.scaler,
+            "adj_mx": self.adj_mx,
+            "num_nodes": self.num_nodes,
+            "feature_dim": self.feature_dim,
+            "ext_dim": self.ext_dim,
+            "output_dim": self.output_dim,
+            "num_batches": self.num_batches,
+        }

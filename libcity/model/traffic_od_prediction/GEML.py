@@ -13,20 +13,16 @@ class SLSTM(nn.Module):
         self.cell_dim = hidden_dim
         self.p_interval = p_interval
         self.f_gate = nn.Sequential(
-            nn.Linear(feature_dim + hidden_dim, self.cell_dim),
-            nn.Softmax(dim=1)
+            nn.Linear(feature_dim + hidden_dim, self.cell_dim), nn.Softmax(dim=1)
         )
         self.i_gate = nn.Sequential(
-            nn.Linear(feature_dim + hidden_dim, self.cell_dim),
-            nn.Softmax(dim=1)
+            nn.Linear(feature_dim + hidden_dim, self.cell_dim), nn.Softmax(dim=1)
         )
         self.o_gate = nn.Sequential(
-            nn.Linear(feature_dim + hidden_dim, self.hidden_dim),
-            nn.Softmax(dim=1)
+            nn.Linear(feature_dim + hidden_dim, self.hidden_dim), nn.Softmax(dim=1)
         )
         self.g_gate = nn.Sequential(
-            nn.Linear(feature_dim + hidden_dim, self.cell_dim),
-            nn.Tanh()
+            nn.Linear(feature_dim + hidden_dim, self.cell_dim), nn.Tanh()
         )
 
         self.tanh = nn.Tanh()
@@ -35,9 +31,19 @@ class SLSTM(nn.Module):
 
     def forward(self, x):
         # (T, B * N, 2E)
-        h = torch.zeros((x.shape[1], self.hidden_dim)).unsqueeze(dim=0).repeat(self.p_interval, 1, 1).to(self.device)
+        h = (
+            torch.zeros((x.shape[1], self.hidden_dim))
+            .unsqueeze(dim=0)
+            .repeat(self.p_interval, 1, 1)
+            .to(self.device)
+        )
         # (P, B * N, 2E)
-        c = torch.zeros((x.shape[1], self.hidden_dim)).unsqueeze(dim=0).repeat(self.p_interval, 1, 1).to(self.device)
+        c = (
+            torch.zeros((x.shape[1], self.hidden_dim))
+            .unsqueeze(dim=0)
+            .repeat(self.p_interval, 1, 1)
+            .to(self.device)
+        )
         # (P, B * N, 2E)
 
         T = x.shape[0]
@@ -67,9 +73,15 @@ class MutiLearning(nn.Module):
     def __init__(self, fea_dim, device):
         super(MutiLearning, self).__init__()
         self.fea_dim = fea_dim
-        self.transition = nn.Parameter(data=torch.randn(self.fea_dim, self.fea_dim).to(device), requires_grad=True)
-        self.project_in = nn.Parameter(data=torch.randn(self.fea_dim, 1).to(device), requires_grad=True)
-        self.project_out = nn.Parameter(data=torch.randn(self.fea_dim, 1).to(device), requires_grad=True)
+        self.transition = nn.Parameter(
+            data=torch.randn(self.fea_dim, self.fea_dim).to(device), requires_grad=True
+        )
+        self.project_in = nn.Parameter(
+            data=torch.randn(self.fea_dim, 1).to(device), requires_grad=True
+        )
+        self.project_out = nn.Parameter(
+            data=torch.randn(self.fea_dim, 1).to(device), requires_grad=True
+        )
 
     def forward(self, x: torch.Tensor):
         # (B, N, 2E)
@@ -101,7 +113,9 @@ class GraphConvolution(nn.Module):
         weight = torch.randn((self.feature_dim, self.embed_dim))
         self.weight = nn.Parameter(data=weight.to(device), requires_grad=True)
         if use_bias:
-            self.bias = nn.Parameter(data=torch.zeros(self.embed_dim).to(device), requires_grad=True)
+            self.bias = nn.Parameter(
+                data=torch.zeros(self.embed_dim).to(device), requires_grad=True
+            )
         else:
             self.bias = None
 
@@ -122,10 +136,12 @@ class GCN(nn.Module):
         super(GCN, self).__init__()
         self.feature_dim = feature_dim
         self.embed_dim = embed_dim
-        self.gcn = nn.ModuleList([
-            GraphConvolution(feature_dim, embed_dim, device),
-            GraphConvolution(embed_dim, embed_dim, device)
-        ])
+        self.gcn = nn.ModuleList(
+            [
+                GraphConvolution(feature_dim, embed_dim, device),
+                GraphConvolution(embed_dim, embed_dim, device),
+            ]
+        )
 
     def forward(self, input_seq, adj_seq):
         embed = []
@@ -166,9 +182,13 @@ def generate_semantic_adj(demand_matrix, device):
     sum_degree_vector = torch.matmul(adj_matrix, degree_vector)
     # (B, T, N, 1)
 
-    weight_matrix = torch.matmul(1 / (sum_degree_vector + 1e-3), degree_vector.permute((0, 1, 3, 2)))  # (B, T, N, N)
+    weight_matrix = torch.matmul(
+        1 / (sum_degree_vector + 1e-3), degree_vector.permute((0, 1, 3, 2))
+    )  # (B, T, N, N)
 
-    weight_matrix[:, :, range(weight_matrix.shape[2]), range(weight_matrix.shape[3])] = 1
+    weight_matrix[
+        :, :, range(weight_matrix.shape[2]), range(weight_matrix.shape[3])
+    ] = 1
 
     return weight_matrix
 
@@ -176,38 +196,44 @@ def generate_semantic_adj(demand_matrix, device):
 class GEML(AbstractTrafficStateModel):
     def __init__(self, config, data_feature):
         super().__init__(config, data_feature)
-        self.num_nodes = self.data_feature.get('num_nodes')
-        self._scaler = self.data_feature.get('scaler')
-        self.output_dim = config.get('output_dim')
-        self.device = config.get('device', torch.device('cpu'))
-        self.input_window = config.get('input_window', 1)
-        self.output_window = config.get('output_window', 1)
+        self.num_nodes = self.data_feature.get("num_nodes")
+        self._scaler = self.data_feature.get("scaler")
+        self.output_dim = config.get("output_dim")
+        self.device = config.get("device", torch.device("cpu"))
+        self.input_window = config.get("input_window", 1)
+        self.output_window = config.get("output_window", 1)
 
-        self.p_interval = config.get('p_interval', 1)
-        self.embed_dim = config.get('embed_dim')
-        self.batch_size = config.get('batch_size')
-        self.loss_p0 = config.get('loss_p0', 0.5)
-        self.loss_p1 = config.get('loss_p1', 0.25)
-        self.loss_p2 = config.get('loss_p2', 0.25)
+        self.p_interval = config.get("p_interval", 1)
+        self.embed_dim = config.get("embed_dim")
+        self.batch_size = config.get("batch_size")
+        self.loss_p0 = config.get("loss_p0", 0.5)
+        self.loss_p1 = config.get("loss_p1", 0.25)
+        self.loss_p2 = config.get("loss_p2", 0.25)
 
-        dis_mx = self.data_feature.get('adj_mx')
-        self.geo_adj = generate_geo_adj(dis_mx) \
-            .repeat(self.batch_size * self.input_window, 1) \
-            .reshape((self.batch_size, self.input_window, self.num_nodes, self.num_nodes)) \
+        dis_mx = self.data_feature.get("adj_mx")
+        self.geo_adj = (
+            generate_geo_adj(dis_mx)
+            .repeat(self.batch_size * self.input_window, 1)
+            .reshape(
+                (self.batch_size, self.input_window, self.num_nodes, self.num_nodes)
+            )
             .to(self.device)
+        )
 
         self.GCN_ge = GCN(self.num_nodes, self.embed_dim, self.device)
         self.GCN_se = GCN(self.num_nodes, self.embed_dim, self.device)
 
         # self.LSTM = nn.LSTM(2 * self.embed_dim, 2 * self.embed_dim)
-        self.LSTM = SLSTM(2 * self.embed_dim, 2 * self.embed_dim, self.device, self.p_interval)
+        self.LSTM = SLSTM(
+            2 * self.embed_dim, 2 * self.embed_dim, self.device, self.p_interval
+        )
 
         self.mutiLearning = MutiLearning(2 * self.embed_dim, self.device)
 
     def forward(self, batch):
-        x = batch['X'].squeeze(dim=-1)
+        x = batch["X"].squeeze(dim=-1)
         # (B, T, N, N)
-        x_ge_embed = self.GCN_ge(x, self.geo_adj[:x.shape[0], ...])
+        x_ge_embed = self.GCN_ge(x, self.geo_adj[: x.shape[0], ...])
         # (B, T, N, E)
 
         x_se_embed = self.GCN_se(x, self.semantic_adj)
@@ -230,26 +256,30 @@ class GEML(AbstractTrafficStateModel):
         return out
 
     def calculate_loss(self, batch):
-        y_true = batch['y']  # (B, TO, N, N, 1)
+        y_true = batch["y"]  # (B, TO, N, N, 1)
         y_in_true = torch.sum(y_true, dim=-2, keepdim=True)  # (B, TO, N, 1)
-        y_out_true = torch.sum(y_true.permute(0, 1, 3, 2, 4), dim=-2, keepdim=True)  # (B, TO, N, 1)
+        y_out_true = torch.sum(
+            y_true.permute(0, 1, 3, 2, 4), dim=-2, keepdim=True
+        )  # (B, TO, N, 1)
         y_pred, y_in, y_out = self.predict(batch)
 
-        y_true = self._scaler.inverse_transform(y_true[..., :self.output_dim])
-        y_in_true = self._scaler.inverse_transform(y_in_true[..., :self.output_dim])
-        y_out_true = self._scaler.inverse_transform(y_out_true[..., :self.output_dim])
+        y_true = self._scaler.inverse_transform(y_true[..., : self.output_dim])
+        y_in_true = self._scaler.inverse_transform(y_in_true[..., : self.output_dim])
+        y_out_true = self._scaler.inverse_transform(y_out_true[..., : self.output_dim])
 
-        y_pred = self._scaler.inverse_transform(y_pred[..., :self.output_dim])
-        y_in = self._scaler.inverse_transform(y_in[..., :self.output_dim])
-        y_out = self._scaler.inverse_transform(y_out[..., :self.output_dim])
+        y_pred = self._scaler.inverse_transform(y_pred[..., : self.output_dim])
+        y_in = self._scaler.inverse_transform(y_in[..., : self.output_dim])
+        y_out = self._scaler.inverse_transform(y_out[..., : self.output_dim])
 
         loss_pred = loss.masked_mse_torch(y_pred, y_true)
         loss_in = loss.masked_mse_torch(y_in, y_in_true)
         loss_out = loss.masked_mse_torch(y_out, y_out_true)
-        return self.loss_p0 * loss_pred + self.loss_p1 * loss_in + self.loss_p2 * loss_out
+        return (
+            self.loss_p0 * loss_pred + self.loss_p1 * loss_in + self.loss_p2 * loss_out
+        )
 
     def predict(self, batch):
-        x = batch['X']  # (B, T, N, N, 1)
+        x = batch["X"]  # (B, T, N, N, 1)
         self.semantic_adj = generate_semantic_adj(x.squeeze(dim=-1), self.device)
         assert x.shape[-1] == 1 or print("The feature_dim must be 1")
         y_pred = []
@@ -257,7 +287,7 @@ class GEML(AbstractTrafficStateModel):
         y_out_pred = []
         x_ = x.clone()
         for i in range(self.output_window):
-            batch_tmp = {'X': x_}
+            batch_tmp = {"X": x_}
             y_, y_in_, y_out_ = self.forward(batch_tmp)  # (B, 1, N, N, 1)
             y_pred.append(y_.clone())
             y_in_pred.append(y_in_.clone())

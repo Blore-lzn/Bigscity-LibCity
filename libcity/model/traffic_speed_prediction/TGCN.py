@@ -20,9 +20,11 @@ def calculate_normalized_laplacian(adj):
     adj = sp.coo_matrix(adj + sp.eye(adj.shape[0]))
     d = np.array(adj.sum(1))
     d_inv_sqrt = np.power(d, -0.5).flatten()
-    d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0.
+    d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0.0
     d_mat_inv_sqrt = sp.diags(d_inv_sqrt)
-    normalized_laplacian = adj.dot(d_mat_inv_sqrt).transpose().dot(d_mat_inv_sqrt).tocoo()
+    normalized_laplacian = (
+        adj.dot(d_mat_inv_sqrt).transpose().dot(d_mat_inv_sqrt).tocoo()
+    )
     return normalized_laplacian
 
 
@@ -43,9 +45,15 @@ class TGCNCell(nn.Module):
 
     def init_params(self, bias_start=0.0):
         input_size = self.input_dim + self.num_units
-        weight_0 = torch.nn.Parameter(torch.empty((input_size, 2 * self.num_units), device=self._device))
-        bias_0 = torch.nn.Parameter(torch.empty(2 * self.num_units, device=self._device))
-        weight_1 = torch.nn.Parameter(torch.empty((input_size, self.num_units), device=self._device))
+        weight_0 = torch.nn.Parameter(
+            torch.empty((input_size, 2 * self.num_units), device=self._device)
+        )
+        bias_0 = torch.nn.Parameter(
+            torch.empty(2 * self.num_units, device=self._device)
+        )
+        weight_1 = torch.nn.Parameter(
+            torch.empty((input_size, self.num_units), device=self._device)
+        )
         bias_1 = torch.nn.Parameter(torch.empty(self.num_units, device=self._device))
 
         torch.nn.init.xavier_normal_(weight_0)
@@ -53,10 +61,10 @@ class TGCNCell(nn.Module):
         torch.nn.init.constant_(bias_0, bias_start)
         torch.nn.init.constant_(bias_1, bias_start)
 
-        self.register_parameter(name='weights_0', param=weight_0)
-        self.register_parameter(name='weights_1', param=weight_1)
-        self.register_parameter(name='bias_0', param=bias_0)
-        self.register_parameter(name='bias_1', param=bias_1)
+        self.register_parameter(name="weights_0", param=weight_0)
+        self.register_parameter(name="weights_1", param=weight_1)
+        self.register_parameter(name="bias_0", param=bias_0)
+        self.register_parameter(name="bias_1", param=bias_1)
 
         self.weigts = {weight_0.shape: weight_0, weight_1.shape: weight_1}
         self.biases = {bias_0.shape: bias_0, bias_1.shape: bias_1}
@@ -83,9 +91,12 @@ class TGCNCell(nn.Module):
         """
         output_size = 2 * self.num_units
         value = torch.sigmoid(
-            self._gc(inputs, state, output_size, bias_start=1.0))  # (batch_size, self.num_nodes, output_size)
+            self._gc(inputs, state, output_size, bias_start=1.0)
+        )  # (batch_size, self.num_nodes, output_size)
         r, u = torch.split(tensor=value, split_size_or_sections=self.num_units, dim=-1)
-        r = torch.reshape(r, (-1, self.num_nodes * self.num_units))  # (batch_size, self.num_nodes * self.gru_units)
+        r = torch.reshape(
+            r, (-1, self.num_nodes * self.num_units)
+        )  # (batch_size, self.num_nodes * self.gru_units)
         u = torch.reshape(u, (-1, self.num_nodes * self.num_units))
 
         c = self.act(self._gc(inputs, r * state, self.num_units))
@@ -107,8 +118,12 @@ class TGCNCell(nn.Module):
             torch.tensor: (B, num_nodes , output_size)
         """
         batch_size = inputs.shape[0]
-        inputs = torch.reshape(inputs, (batch_size, self.num_nodes, -1))  # (batch, self.num_nodes, self.dim)
-        state = torch.reshape(state, (batch_size, self.num_nodes, -1))  # (batch, self.num_nodes, self.gru_units)
+        inputs = torch.reshape(
+            inputs, (batch_size, self.num_nodes, -1)
+        )  # (batch, self.num_nodes, self.dim)
+        state = torch.reshape(
+            state, (batch_size, self.num_nodes, -1)
+        )  # (batch, self.num_nodes, self.gru_units)
         inputs_and_state = torch.cat([inputs, state], dim=2)
         input_size = inputs_and_state.shape[2]
 
@@ -120,7 +135,9 @@ class TGCNCell(nn.Module):
 
         x1 = x1.reshape(shape=(self.num_nodes, input_size, batch_size))
         x1 = x1.permute(2, 0, 1)  # (batch_size, self.num_nodes, input_size)
-        x1 = x1.reshape(shape=(-1, input_size))  # (batch_size * self.num_nodes, input_size)
+        x1 = x1.reshape(
+            shape=(-1, input_size)
+        )  # (batch_size * self.num_nodes, input_size)
 
         weights = self.weigts[(input_size, output_size)]
         x1 = torch.matmul(x1, weights)  # (batch_size * self.num_nodes, output_size)
@@ -134,25 +151,29 @@ class TGCNCell(nn.Module):
 
 class TGCN(AbstractTrafficStateModel):
     def __init__(self, config, data_feature):
-        self.adj_mx = data_feature.get('adj_mx')
-        self.num_nodes = data_feature.get('num_nodes', 1)
-        config['num_nodes'] = self.num_nodes
-        self.input_dim = data_feature.get('feature_dim', 1)
-        self.output_dim = data_feature.get('output_dim', 1)
-        self.gru_units = int(config.get('rnn_units', 64))
-        self.lam = config.get('lambda', 0.0015)
+        self.adj_mx = data_feature.get("adj_mx")
+        self.num_nodes = data_feature.get("num_nodes", 1)
+        config["num_nodes"] = self.num_nodes
+        self.input_dim = data_feature.get("feature_dim", 1)
+        self.output_dim = data_feature.get("output_dim", 1)
+        self.gru_units = int(config.get("rnn_units", 64))
+        self.lam = config.get("lambda", 0.0015)
 
         super().__init__(config, data_feature)
 
-        self.input_window = config.get('input_window', 1)
-        self.output_window = config.get('output_window', 1)
-        self.device = config.get('device', torch.device('cpu'))
+        self.input_window = config.get("input_window", 1)
+        self.output_window = config.get("output_window", 1)
+        self.device = config.get("device", torch.device("cpu"))
         self._logger = getLogger()
-        self._scaler = self.data_feature.get('scaler')
+        self._scaler = self.data_feature.get("scaler")
 
         # -------------------构造模型-----------------------------
-        self.tgcn_model = TGCNCell(self.gru_units, self.adj_mx, self.num_nodes, self.device, self.input_dim)
-        self.output_model = nn.Linear(self.gru_units, self.output_window * self.output_dim)
+        self.tgcn_model = TGCNCell(
+            self.gru_units, self.adj_mx, self.num_nodes, self.device, self.input_dim
+        )
+        self.output_model = nn.Linear(
+            self.gru_units, self.output_window * self.output_dim
+        )
 
     def forward(self, batch):
         """
@@ -164,20 +185,30 @@ class TGCN(AbstractTrafficStateModel):
         Returns:
             torch.tensor: (batch_size, self.output_window, self.num_nodes, self.output_dim)
         """
-        inputs = batch['X']
+        inputs = batch["X"]
         # labels = batch['y']
 
         batch_size, input_window, num_nodes, input_dim = inputs.shape
-        inputs = inputs.permute(1, 0, 2, 3)  # (input_window, batch_size, num_nodes, input_dim)
-        inputs = inputs.view(self.input_window, batch_size, num_nodes * input_dim).to(self.device)
+        inputs = inputs.permute(
+            1, 0, 2, 3
+        )  # (input_window, batch_size, num_nodes, input_dim)
+        inputs = inputs.view(self.input_window, batch_size, num_nodes * input_dim).to(
+            self.device
+        )
 
         state = torch.zeros(batch_size, self.num_nodes * self.gru_units).to(self.device)
         for t in range(input_window):
             state = self.tgcn_model(inputs[t], state)
 
-        state = state.view(batch_size, self.num_nodes, self.gru_units)  # (batch_size, self.num_nodes, self.gru_units)
-        output = self.output_model(state)  # (batch_size, self.num_nodes, self.output_window * self.output_dim)
-        output = output.view(batch_size, self.num_nodes, self.output_window, self.output_dim)
+        state = state.view(
+            batch_size, self.num_nodes, self.gru_units
+        )  # (batch_size, self.num_nodes, self.gru_units)
+        output = self.output_model(
+            state
+        )  # (batch_size, self.num_nodes, self.output_window * self.output_dim)
+        output = output.view(
+            batch_size, self.num_nodes, self.output_window, self.output_dim
+        )
         output = output.permute(0, 2, 1, 3)
         return output
 
@@ -185,11 +216,13 @@ class TGCN(AbstractTrafficStateModel):
         lam = self.lam
         lreg = sum((torch.norm(param) ** 2 / 2) for param in self.parameters())
 
-        labels = batch['y']
+        labels = batch["y"]
         y_predicted = self.predict(batch)
 
-        y_true = self._scaler.inverse_transform(labels[..., :self.output_dim])
-        y_predicted = self._scaler.inverse_transform(y_predicted[..., :self.output_dim])
+        y_true = self._scaler.inverse_transform(labels[..., : self.output_dim])
+        y_predicted = self._scaler.inverse_transform(
+            y_predicted[..., : self.output_dim]
+        )
 
         loss = torch.mean(torch.norm(y_true - y_predicted) ** 2 / 2) + lam * lreg
         loss /= y_predicted.numel()

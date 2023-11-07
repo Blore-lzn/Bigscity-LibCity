@@ -15,5 +15,5 @@ __all__ = [
     "StanEncoder",
     "HstlstmEncoder",
     "StrnnEncoder",
-    "CARATrajectoryEncoder"
+    "CARATrajectoryEncoder",
 ]

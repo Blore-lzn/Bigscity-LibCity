@@ -22,7 +22,7 @@ def calculate_scaled_laplacian(adj):
     """
     n = adj.shape[0]
     d = np.sum(adj, axis=1)  # D
-    lap = np.diag(d) - adj     # L=D-A
+    lap = np.diag(d) - adj  # L=D-A
     for i in range(n):
         for j in range(n):
             if d[i] > 0 and d[j] > 0:
@@ -50,19 +50,19 @@ def calculate_cheb_poly(lap, ks):
     for i in range(2, ks):
         lap_list.append(np.matmul(2 * lap, lap_list[-1]) - lap_list[-2])
     if ks == 0:
-        raise ValueError('Ks must bigger than 0!')
+        raise ValueError("Ks must bigger than 0!")
     if ks == 1:
         return np.asarray(lap_list[0:1])  # 1*n*n
     else:
-        return np.asarray(lap_list)       # Ks*n*n
+        return np.asarray(lap_list)  # Ks*n*n
 
 
 def calculate_first_approx(weight):
-    '''
+    """
     1st-order approximation function.
     :param W: weighted adjacency matrix of G. Not laplacian matrix.
     :return: np.ndarray
-    '''
+    """
     # TODO: 如果W对角线本来就是全1？
     n = weight.shape[0]
     adj = weight + np.identity(n)
@@ -71,7 +71,7 @@ def calculate_first_approx(weight):
     # return np.array(sinvd * A * sinvd)
     sinvd = np.sqrt(np.linalg.inv(np.diag(d)))
     lap = np.matmul(np.matmul(sinvd, adj), sinvd)  # n*n
-    lap = np.expand_dims(lap, axis=0)              # 1*n*n
+    lap = np.expand_dims(lap, axis=0)  # 1*n*n
     return lap
 
 
@@ -109,12 +109,16 @@ class TemporalConvLayer(nn.Module):
         :param x: (batch_size, feature_dim(c_in), input_length, num_nodes)
         :return: (batch_size, c_out, input_length-kt+1, num_nodes)
         """
-        x_in = self.align(x)[:, :, self.kt - 1:, :]  # (batch_size, c_out, input_length-kt+1, num_nodes)
+        x_in = self.align(x)[
+            :, :, self.kt - 1 :, :
+        ]  # (batch_size, c_out, input_length-kt+1, num_nodes)
         if self.act == "GLU":
             # x: (batch_size, c_in, input_length, num_nodes)
             x_conv = self.conv(x)
             # x_conv: (batch_size, c_out * 2, input_length-kt+1, num_nodes)  [P Q]
-            return (x_conv[:, :self.c_out, :, :] + x_in) * torch.sigmoid(x_conv[:, self.c_out:, :, :])
+            return (x_conv[:, : self.c_out, :, :] + x_in) * torch.sigmoid(
+                x_conv[:, self.c_out :, :, :]
+            )
             # return P * sigmoid(Q) shape: (batch_size, c_out, input_length-kt+1, num_nodes)
         if self.act == "sigmoid":
             return torch.sigmoid(self.conv(x) + x_in)  # residual connection
@@ -125,7 +129,9 @@ class SpatioConvLayer(nn.Module):
     def __init__(self, ks, c_in, c_out, lk, device):
         super(SpatioConvLayer, self).__init__()
         self.Lk = lk
-        self.theta = nn.Parameter(torch.FloatTensor(c_in, c_out, ks).to(device))  # kernel: C_in*C_out*ks
+        self.theta = nn.Parameter(
+            torch.FloatTensor(c_in, c_out, ks).to(device)
+        )  # kernel: C_in*C_out*ks
         self.b = nn.Parameter(torch.FloatTensor(1, c_out, 1, 1).to(device))
         self.align = Align(c_in, c_out)
         self.reset_parameters()
@@ -143,7 +149,9 @@ class SpatioConvLayer(nn.Module):
         # theta: (c_in, c_out, Ks)
         # x_gc: (batch_size, c_out, input_length, num_nodes)
         x_c = torch.einsum("knm,bitm->bitkn", self.Lk, x)  # delete num_nodes(n)
-        x_gc = torch.einsum("iok,bitkn->botn", self.theta, x_c) + self.b  # delete Ks(k) c_in(i)
+        x_gc = (
+            torch.einsum("iok,bitkn->botn", self.theta, x_c) + self.b
+        )  # delete Ks(k) c_in(i)
         x_in = self.align(x)  # (batch_size, c_out, input_length, num_nodes)
         return torch.relu(x_gc + x_in)  # residual connection
 
@@ -158,8 +166,8 @@ class STConvBlock(nn.Module):
         self.dropout = nn.Dropout(p)
 
     def forward(self, x):  # x: (batch_size, feature_dim/c[0], input_length, num_nodes)
-        x_t1 = self.tconv1(x)    # (batch_size, c[1], input_length-kt+1, num_nodes)
-        x_s = self.sconv(x_t1)   # (batch_size, c[1], input_length-kt+1, num_nodes)
+        x_t1 = self.tconv1(x)  # (batch_size, c[1], input_length-kt+1, num_nodes)
+        x_s = self.sconv(x_t1)  # (batch_size, c[1], input_length-kt+1, num_nodes)
         x_t2 = self.tconv2(x_s)  # (batch_size, c[2], input_length-kt+1-kt+1, num_nodes)
         x_ln = self.ln(x_t2.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)
         return self.dropout(x_ln)
@@ -197,89 +205,133 @@ class OutputLayer(nn.Module):
 class STGCN(AbstractTrafficStateModel):
     def __init__(self, config, data_feature):
         super().__init__(config, data_feature)
-        self.num_nodes = self.data_feature.get('num_nodes', 1)
-        self.feature_dim = self.data_feature.get('feature_dim', 1)
-        self.output_dim = self.data_feature.get('output_dim', 1)
-        self._scaler = self.data_feature.get('scaler')
+        self.num_nodes = self.data_feature.get("num_nodes", 1)
+        self.feature_dim = self.data_feature.get("feature_dim", 1)
+        self.output_dim = self.data_feature.get("output_dim", 1)
+        self._scaler = self.data_feature.get("scaler")
         self._logger = getLogger()
 
-        self.Ks = config.get('Ks', 3)
-        self.Kt = config.get('Kt', 3)
-        self.blocks = config.get('blocks', [[1, 32, 64], [64, 32, 128]])
-        self.input_window = config.get('input_window', 1)
-        self.output_window = config.get('output_window', 1)
-        self.drop_prob = config.get('dropout', 0)
+        self.Ks = config.get("Ks", 3)
+        self.Kt = config.get("Kt", 3)
+        self.blocks = config.get("blocks", [[1, 32, 64], [64, 32, 128]])
+        self.input_window = config.get("input_window", 1)
+        self.output_window = config.get("output_window", 1)
+        self.drop_prob = config.get("dropout", 0)
 
-        self.train_mode = config.get('stgcn_train_mode', 'quick')  # or full
-        if self.train_mode.lower() not in ['quick', 'full']:
-            raise ValueError('STGCN_train_mode must be `quick` or `full`.')
-        self._logger.info('You select {} mode to train STGCN model.'.format(self.train_mode))
+        self.train_mode = config.get("stgcn_train_mode", "quick")  # or full
+        if self.train_mode.lower() not in ["quick", "full"]:
+            raise ValueError("STGCN_train_mode must be `quick` or `full`.")
+        self._logger.info(
+            "You select {} mode to train STGCN model.".format(self.train_mode)
+        )
         self.blocks[0][0] = self.feature_dim
         if self.input_window - len(self.blocks) * 2 * (self.Kt - 1) <= 0:
-            raise ValueError('Input_window must bigger than 4*(Kt-1) for 2 STConvBlock'
-                             ' have 4 kt-kernel convolutional layer.')
-        self.device = config.get('device', torch.device('cpu'))
+            raise ValueError(
+                "Input_window must bigger than 4*(Kt-1) for 2 STConvBlock"
+                " have 4 kt-kernel convolutional layer."
+            )
+        self.device = config.get("device", torch.device("cpu"))
 
-        self.graph_conv_type = config.get('graph_conv_type', 'chebconv')
-        adj_mx = data_feature['adj_mx']  # ndarray
+        self.graph_conv_type = config.get("graph_conv_type", "chebconv")
+        adj_mx = data_feature["adj_mx"]  # ndarray
         # 计算GCN邻接矩阵的归一化拉普拉斯矩阵和对应的切比雪夫多项式或一阶近似
-        if self.graph_conv_type.lower() == 'chebconv':
+        if self.graph_conv_type.lower() == "chebconv":
             laplacian_mx = calculate_scaled_laplacian(adj_mx)
             self.Lk = calculate_cheb_poly(laplacian_mx, self.Ks)
-            self._logger.info('Chebyshev_polynomial_Lk shape: ' + str(self.Lk.shape))
+            self._logger.info("Chebyshev_polynomial_Lk shape: " + str(self.Lk.shape))
             self.Lk = torch.FloatTensor(self.Lk).to(self.device)
-        elif self.graph_conv_type.lower() == 'gcnconv':
+        elif self.graph_conv_type.lower() == "gcnconv":
             self.Lk = calculate_first_approx(adj_mx)
-            self._logger.info('First_approximation_Lk shape: ' + str(self.Lk.shape))
+            self._logger.info("First_approximation_Lk shape: " + str(self.Lk.shape))
             self.Lk = torch.FloatTensor(self.Lk).to(self.device)
             self.Ks = 1  # 一阶近似保留到K0和K1，但是不是数组形式，只有一个n*n矩阵，所以是1（本质上是2）
         else:
-            raise ValueError('Error graph_conv_type, must be chebconv or gcnconv.')
+            raise ValueError("Error graph_conv_type, must be chebconv or gcnconv.")
 
         # 模型结构
-        self.st_conv1 = STConvBlock(self.Ks, self.Kt, self.num_nodes,
-                                    self.blocks[0], self.drop_prob, self.Lk, self.device)
-        self.st_conv2 = STConvBlock(self.Ks, self.Kt, self.num_nodes,
-                                    self.blocks[1], self.drop_prob, self.Lk, self.device)
-        self.output = OutputLayer(self.blocks[1][2], self.input_window - len(self.blocks) * 2
-                                  * (self.Kt - 1), self.num_nodes, self.output_dim)
+        self.st_conv1 = STConvBlock(
+            self.Ks,
+            self.Kt,
+            self.num_nodes,
+            self.blocks[0],
+            self.drop_prob,
+            self.Lk,
+            self.device,
+        )
+        self.st_conv2 = STConvBlock(
+            self.Ks,
+            self.Kt,
+            self.num_nodes,
+            self.blocks[1],
+            self.drop_prob,
+            self.Lk,
+            self.device,
+        )
+        self.output = OutputLayer(
+            self.blocks[1][2],
+            self.input_window - len(self.blocks) * 2 * (self.Kt - 1),
+            self.num_nodes,
+            self.output_dim,
+        )
 
     def forward(self, batch):
-        x = batch['X']  # (batch_size, input_length, num_nodes, feature_dim)
+        x = batch["X"]  # (batch_size, input_length, num_nodes, feature_dim)
         x = x.permute(0, 3, 1, 2)  # (batch_size, feature_dim, input_length, num_nodes)
-        x_st1 = self.st_conv1(x)   # (batch_size, c[2](64), input_length-kt+1-kt+1, num_nodes)
-        x_st2 = self.st_conv2(x_st1)  # (batch_size, c[2](128), input_length-kt+1-kt+1-kt+1-kt+1, num_nodes)
-        outputs = self.output(x_st2)  # (batch_size, output_dim(1), output_length(1), num_nodes)
-        outputs = outputs.permute(0, 2, 3, 1)  # (batch_size, output_length(1), num_nodes, output_dim)
+        x_st1 = self.st_conv1(
+            x
+        )  # (batch_size, c[2](64), input_length-kt+1-kt+1, num_nodes)
+        x_st2 = self.st_conv2(
+            x_st1
+        )  # (batch_size, c[2](128), input_length-kt+1-kt+1-kt+1-kt+1, num_nodes)
+        outputs = self.output(
+            x_st2
+        )  # (batch_size, output_dim(1), output_length(1), num_nodes)
+        outputs = outputs.permute(
+            0, 2, 3, 1
+        )  # (batch_size, output_length(1), num_nodes, output_dim)
         return outputs
 
     def calculate_loss(self, batch):
-        if self.train_mode.lower() == 'quick':
+        if self.train_mode.lower() == "quick":
             if self.training:  # 训练使用t+1时间步的loss
-                y_true = batch['y'][:, 0:1, :, :]  # (batch_size, 1, num_nodes, feature_dim)
-                y_predicted = self.forward(batch)  # (batch_size, 1, num_nodes, output_dim)
+                y_true = batch["y"][
+                    :, 0:1, :, :
+                ]  # (batch_size, 1, num_nodes, feature_dim)
+                y_predicted = self.forward(
+                    batch
+                )  # (batch_size, 1, num_nodes, output_dim)
             else:  # 其他情况使用全部时间步的loss
-                y_true = batch['y']  # (batch_size, output_length, num_nodes, feature_dim)
-                y_predicted = self.predict(batch)  # (batch_size, output_length, num_nodes, output_dim)
-        else:   # 'full'
-            y_true = batch['y']  # (batch_size, output_length, num_nodes, feature_dim)
-            y_predicted = self.predict(batch)  # (batch_size, output_length, num_nodes, output_dim)
-        y_true = self._scaler.inverse_transform(y_true[..., :self.output_dim])
-        y_predicted = self._scaler.inverse_transform(y_predicted[..., :self.output_dim])
+                y_true = batch[
+                    "y"
+                ]  # (batch_size, output_length, num_nodes, feature_dim)
+                y_predicted = self.predict(
+                    batch
+                )  # (batch_size, output_length, num_nodes, output_dim)
+        else:  # 'full'
+            y_true = batch["y"]  # (batch_size, output_length, num_nodes, feature_dim)
+            y_predicted = self.predict(
+                batch
+            )  # (batch_size, output_length, num_nodes, output_dim)
+        y_true = self._scaler.inverse_transform(y_true[..., : self.output_dim])
+        y_predicted = self._scaler.inverse_transform(
+            y_predicted[..., : self.output_dim]
+        )
         return loss.masked_mse_torch(y_predicted, y_true)
 
     def predict(self, batch):
         # 多步预测
-        x = batch['X']  # (batch_size, input_length, num_nodes, feature_dim)
-        y = batch['y']  # (batch_size, output_length, num_nodes, feature_dim)
+        x = batch["X"]  # (batch_size, input_length, num_nodes, feature_dim)
+        y = batch["y"]  # (batch_size, output_length, num_nodes, feature_dim)
         y_preds = []
         x_ = x.clone()
         for i in range(self.output_window):
-            batch_tmp = {'X': x_}
+            batch_tmp = {"X": x_}
             y_ = self.forward(batch_tmp)  # (batch_size, 1, num_nodes, output_dim)
             y_preds.append(y_.clone())
             if y_.shape[-1] < x_.shape[-1]:  # output_dim < feature_dim
-                y_ = torch.cat([y_, y[:, i:i+1, :, self.output_dim:]], dim=3)
+                y_ = torch.cat([y_, y[:, i : i + 1, :, self.output_dim :]], dim=3)
             x_ = torch.cat([x_[:, 1:, :, :], y_], dim=1)
-        y_preds = torch.cat(y_preds, dim=1)  # (batch_size, output_length, num_nodes, output_dim)
+        y_preds = torch.cat(
+            y_preds, dim=1
+        )  # (batch_size, output_length, num_nodes, output_dim)
         return y_preds

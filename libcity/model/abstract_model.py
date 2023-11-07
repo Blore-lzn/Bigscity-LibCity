@@ -2,7 +2,6 @@ import torch.nn as nn
 
 
 class AbstractModel(nn.Module):
-
     def __init__(self, config, data_feature):
         nn.Module.__init__(self)
 

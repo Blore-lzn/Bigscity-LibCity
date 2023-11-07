@@ -10,6 +10,7 @@ from libcity.model.trajectory_loc_prediction.STAN import STAN
 from libcity.model.trajectory_loc_prediction.CARA import CARA
 from libcity.model.trajectory_loc_prediction.GeoSAN import GeoSAN
 from libcity.model.trajectory_loc_prediction.HSTLSTM import HSTLSTM
+
 __all__ = [
     "DeepMove",
     "RNN",
@@ -22,5 +23,5 @@ __all__ = [
     "STAN",
     "CARA",
     "GeoSAN",
-    "HSTLSTM"
+    "HSTLSTM",
 ]

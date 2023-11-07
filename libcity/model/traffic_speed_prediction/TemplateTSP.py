@@ -16,20 +16,20 @@ class TemplateTSP(AbstractTrafficStateModel):
         # 2.从data_feature获取想要的信息，注意不同模型使用不同的Dataset类，其返回的data_feature内容不同（必须）
         # 以TrafficStateGridDataset为例演示取数据，可以取出如下的数据，用不到的可以不取
         # **这些参数的不能从config中取的**
-        self._scaler = self.data_feature.get('scaler')  # 用于数据归一化
-        self.adj_mx = self.data_feature.get('adj_mx', 1)  # 邻接矩阵
-        self.num_nodes = self.data_feature.get('num_nodes', 1)  # 网格个数
-        self.feature_dim = self.data_feature.get('feature_dim', 1)  # 输入维度
-        self.output_dim = self.data_feature.get('output_dim', 1)  # 输出维度
-        self.len_row = self.data_feature.get('len_row', 1)  # 网格行数
-        self.len_column = self.data_feature.get('len_column', 1)  # 网格列数
+        self._scaler = self.data_feature.get("scaler")  # 用于数据归一化
+        self.adj_mx = self.data_feature.get("adj_mx", 1)  # 邻接矩阵
+        self.num_nodes = self.data_feature.get("num_nodes", 1)  # 网格个数
+        self.feature_dim = self.data_feature.get("feature_dim", 1)  # 输入维度
+        self.output_dim = self.data_feature.get("output_dim", 1)  # 输出维度
+        self.len_row = self.data_feature.get("len_row", 1)  # 网格行数
+        self.len_column = self.data_feature.get("len_column", 1)  # 网格列数
         # 3.初始化log用于必要的输出（必须）
         self._logger = getLogger()
         # 4.初始化device（必须）
-        self.device = config.get('device', torch.device('cpu'))
+        self.device = config.get("device", torch.device("cpu"))
         # 5.初始化输入输出时间步的长度（非必须）
-        self.input_window = config.get('input_window', 1)
-        self.output_window = config.get('output_window', 1)
+        self.input_window = config.get("input_window", 1)
+        self.output_window = config.get("output_window", 1)
         # 6.从config中取用到的其他参数，主要是用于构造模型结构的参数（必须）
         # 这些涉及到模型结构的参数应该放在libcity/config/model/model_name.json中（必须）
         # 例如: self.blocks = config['blocks']
@@ -63,12 +63,14 @@ class TemplateTSP(AbstractTrafficStateModel):
         :return: training loss (tensor)
         """
         # 1.取出真值 ground_truth
-        y_true = batch['y']
+        y_true = batch["y"]
         # 2.取出预测值
         y_predicted = self.predict(batch)
         # 3.使用self._scaler将进行了归一化的真值和预测值进行反向归一化（必须）
-        y_true = self._scaler.inverse_transform(y_true[..., :self.output_dim])
-        y_predicted = self._scaler.inverse_transform(y_predicted[..., :self.output_dim])
+        y_true = self._scaler.inverse_transform(y_true[..., : self.output_dim])
+        y_predicted = self._scaler.inverse_transform(
+            y_predicted[..., : self.output_dim]
+        )
         # 4.调用loss函数计算真值和预测值的误差
         # libcity/model/loss.py中定义了常见的loss函数
         # 如果模型源码用到了其中的loss，则可以直接调用，以MSE为例:

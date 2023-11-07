@@ -1,4 +1,3 @@
-
 class AbstractTrajectoryEncoder(object):
     """Trajectory Encoder
 
@@ -37,7 +36,7 @@ class AbstractTrajectoryEncoder(object):
         self.feature_max_len = {}
         self.feature_dict = {}
         self.data_feature = {}
-        self.cache_file_name = ''
+        self.cache_file_name = ""
 
     def encode(self, uid, trajectories, negative_sample=None):
         """Encode trajectories of user uid.

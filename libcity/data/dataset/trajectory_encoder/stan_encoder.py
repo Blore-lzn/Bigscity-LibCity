@@ -2,13 +2,23 @@ import os
 import numpy as np
 import pandas as pd
 from math import radians, cos, sin, asin, sqrt
-from libcity.data.dataset.trajectory_encoder.abstract_trajectory_encoder import AbstractTrajectoryEncoder
+from libcity.data.dataset.trajectory_encoder.abstract_trajectory_encoder import (
+    AbstractTrajectoryEncoder,
+)
 from libcity.utils import parse_time, cal_timeoff
 from libcity.utils.dataset import parse_coordinate
 from tqdm import tqdm
 
-parameter_list = ['dataset', 'min_session_len', 'min_sessions', 'traj_encoder', 'cut_method',
-                  'window_size', 'min_checkins', 'max_session_len']
+parameter_list = [
+    "dataset",
+    "min_session_len",
+    "min_sessions",
+    "traj_encoder",
+    "cut_method",
+    "window_size",
+    "min_checkins",
+    "max_session_len",
+]
 
 
 def haversine(lon1, lat1, lon2, lat2):
@@ -26,7 +36,6 @@ def haversine(lon1, lat1, lon2, lat2):
 
 
 class StanEncoder(AbstractTrajectoryEncoder):
-
     def __init__(self, config):
         super().__init__(config)
         self.uid = 1  # 0 for padding
@@ -34,16 +43,23 @@ class StanEncoder(AbstractTrajectoryEncoder):
         self.id2location = {}
         self.ex = [0, 0, 0, 0]  # 距离最大值 最小值（0） 时间差最大值 最小值（0）
         self.loc_id = 1  # 0 for padding
-        self.feature_dict = {'traj': 'int', 'traj_temporal_mat': 'float',
-                             'candiate_temporal_vec': 'float', 'traj_len': 'int',
-                             'target': 'int', 'uid': 'int'}
-        self.max_len = self.config['max_session_len']  # 最后一个点需要留作 target
-        parameters_str = ''
+        self.feature_dict = {
+            "traj": "int",
+            "traj_temporal_mat": "float",
+            "candiate_temporal_vec": "float",
+            "traj_len": "int",
+            "target": "int",
+            "uid": "int",
+        }
+        self.max_len = self.config["max_session_len"]  # 最后一个点需要留作 target
+        parameters_str = ""
         for key in parameter_list:
             if key in self.config:
-                parameters_str += '_' + str(self.config[key])
+                parameters_str += "_" + str(self.config[key])
         self.cache_file_name = os.path.join(
-            './libcity/cache/dataset_cache/', 'trajectory_{}.json'.format(parameters_str))
+            "./libcity/cache/dataset_cache/",
+            "trajectory_{}.json".format(parameters_str),
+        )
 
     def encode(self, uid, trajectories, negative_sample=None):
         """standard encoder use the same method as DeepMove
@@ -87,19 +103,19 @@ class StanEncoder(AbstractTrajectoryEncoder):
             # 一条轨迹可以产生多条训练数据，根据第一个点预测第二个点，前两个点预测第三个点....
             for i in range(len(traj) - 1):
                 trace = []
-                target = int(current_traj[i+1][1])
+                target = int(current_traj[i + 1][1])
                 # mask current_traj and traj_temporal_mat
                 mask = np.zeros((self.max_len, 3), np.int32)
-                mask[:i+1, :] = 1
+                mask[: i + 1, :] = 1
                 mask_traj = current_traj[:-1] * mask
                 mask = np.zeros((self.max_len, self.max_len))
-                mask[:i+1, :i+1] = 1
+                mask[: i + 1, : i + 1] = 1
                 mask_traj_temporal_mat = traj_temporal_mat * mask
                 trace.append(mask_traj.tolist())
                 trace.append(mask_traj_temporal_mat.tolist())
                 trace.append(candiate_temporal_mat[i].tolist())
-                trace.append(i+1)
-                trace.append(target-1)  # 因为模型预测是从 0 开始预测，而我们的 encode 是从 1 开始
+                trace.append(i + 1)
+                trace.append(target - 1)  # 因为模型预测是从 0 开始预测，而我们的 encode 是从 1 开始
                 trace.append(uid)
                 encoded_trajectories.append(trace)
         return encoded_trajectories
@@ -107,11 +123,11 @@ class StanEncoder(AbstractTrajectoryEncoder):
     def gen_data_feature(self):
         spatial_mat = self._cal_poi_matrix()
         self.data_feature = {
-            'loc_size': self.loc_id,
-            'tim_size': 169,  # padding value is zero, true time code is 1-168
-            'uid_size': self.uid,
-            'spatial_matrix': spatial_mat,
-            'ex': self.ex
+            "loc_size": self.loc_id,
+            "tim_size": 169,  # padding value is zero, true time code is 1-168
+            "uid_size": self.uid,
+            "spatial_matrix": spatial_mat,
+            "ex": self.ex,
         }
 
     def _cal_mat1(self, current_tim):
@@ -135,7 +151,7 @@ class StanEncoder(AbstractTrajectoryEncoder):
                 continue
             for j in range(i):
                 off = abs(cal_timeoff(current_tim[i], current_tim[j]))
-                mat[i-1][j] = off
+                mat[i - 1][j] = off
                 if off > self.ex[3]:
                     self.ex[3] = off
         return mat
@@ -145,16 +161,22 @@ class StanEncoder(AbstractTrajectoryEncoder):
         return time.hour + time.weekday() * 24 + 1
 
     def _cal_poi_matrix(self):
-        self.dataset = self.config.get('dataset', '')
-        self.geo_file = self.config.get('geo_file', self.dataset)
-        poi_profile = pd.read_csv('./raw_data/{}/{}.geo'.format(self.dataset, self.geo_file))
-        mat = np.zeros((self.loc_id-1, self.loc_id-1))
-        for i in tqdm(range(1, self.loc_id), desc='calculate poi distance matrix'):
-            lon_i, lat_i = parse_coordinate(poi_profile.iloc[self.id2location[i]]['coordinates'])
+        self.dataset = self.config.get("dataset", "")
+        self.geo_file = self.config.get("geo_file", self.dataset)
+        poi_profile = pd.read_csv(
+            "./raw_data/{}/{}.geo".format(self.dataset, self.geo_file)
+        )
+        mat = np.zeros((self.loc_id - 1, self.loc_id - 1))
+        for i in tqdm(range(1, self.loc_id), desc="calculate poi distance matrix"):
+            lon_i, lat_i = parse_coordinate(
+                poi_profile.iloc[self.id2location[i]]["coordinates"]
+            )
             for j in range(1, self.loc_id):
-                lon_j, lat_j = parse_coordinate(poi_profile.iloc[self.id2location[j]]['coordinates'])
+                lon_j, lat_j = parse_coordinate(
+                    poi_profile.iloc[self.id2location[j]]["coordinates"]
+                )
                 dis = haversine(lon_i, lat_i, lon_j, lat_j)
-                mat[i-1][j-1] = dis
+                mat[i - 1][j - 1] = dis
                 if dis > self.ex[0]:
                     self.ex[0] = dis
         return mat.tolist()

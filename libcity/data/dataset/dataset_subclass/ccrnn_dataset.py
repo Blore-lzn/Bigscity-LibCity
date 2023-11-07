@@ -3,6 +3,7 @@ import numpy as np
 from scipy.spatial.distance import cdist
 from libcity.utils import ensure_dir
 from libcity.data.dataset import TrafficStatePointDataset
+
 # from libcity.data.dataset import TrafficStateGridDataset
 
 
@@ -17,15 +18,16 @@ CCRNNDataset既可以继承TrafficStatePointDataset，也可以继承TrafficStat
 
 
 class CCRNNDataset(TrafficStatePointDataset):
-
     def __init__(self, config):
         super().__init__(config)
         self.use_row_column = False
-        self.hidden_size = config.get('hidden_size', 20)
-        self.method = config.get('method', 'big')
-        self.parameters_str += '_save_adj'
-        self.cache_file_name = os.path.join('./libcity/cache/dataset_cache/',
-                                            'point_based_{}.npz'.format(self.parameters_str))
+        self.hidden_size = config.get("hidden_size", 20)
+        self.method = config.get("method", "big")
+        self.parameters_str += "_save_adj"
+        self.cache_file_name = os.path.join(
+            "./libcity/cache/dataset_cache/",
+            "point_based_{}.npz".format(self.parameters_str),
+        )
 
     def _load_rel(self):
         """
@@ -52,7 +54,9 @@ class CCRNNDataset(TrafficStatePointDataset):
         else:  # str
             data_files = [self.data_files].copy()
         # 加载外部数据
-        if self.load_external and os.path.exists(self.data_path + self.ext_file + '.ext'):  # 外部数据集
+        if self.load_external and os.path.exists(
+            self.data_path + self.ext_file + ".ext"
+        ):  # 外部数据集
             ext_data = self._load_ext()
         else:
             ext_data = None
@@ -101,12 +105,21 @@ class CCRNNDataset(TrafficStatePointDataset):
         # train
         x_train, y_train = x[:num_train], y[:num_train]
         # val
-        x_val, y_val = x[num_train: num_train + num_val], y[num_train: num_train + num_val]
+        x_val, y_val = (
+            x[num_train : num_train + num_val],
+            y[num_train : num_train + num_val],
+        )
         # test
         x_test, y_test = x[-num_test:], y[-num_test:]
-        self._logger.info("train\t" + "x: " + str(x_train.shape) + ", y: " + str(y_train.shape))
-        self._logger.info("eval\t" + "x: " + str(x_val.shape) + ", y: " + str(y_val.shape))
-        self._logger.info("test\t" + "x: " + str(x_test.shape) + ", y: " + str(y_test.shape))
+        self._logger.info(
+            "train\t" + "x: " + str(x_train.shape) + ", y: " + str(y_train.shape)
+        )
+        self._logger.info(
+            "eval\t" + "x: " + str(x_val.shape) + ", y: " + str(y_val.shape)
+        )
+        self._logger.info(
+            "test\t" + "x: " + str(x_test.shape) + ", y: " + str(y_test.shape)
+        )
 
         self.adj_mx = self._generate_graph_with_data(data=df, len=num_train)
         if self.cache_dataset:
@@ -119,9 +132,9 @@ class CCRNNDataset(TrafficStatePointDataset):
                 y_test=y_test,
                 x_val=x_val,
                 y_val=y_val,
-                adj_mx=self.adj_mx
+                adj_mx=self.adj_mx,
             )
-            self._logger.info('Saved at ' + self.cache_file_name)
+            self._logger.info("Saved at " + self.cache_file_name)
         return x_train, y_train, x_val, y_val, x_test, y_test
 
     def _generate_train_val_test(self):
@@ -153,36 +166,48 @@ class CCRNNDataset(TrafficStatePointDataset):
                 x_test: (num_samples, input_length, ..., feature_dim) \n
                 y_test: (num_samples, input_length, ..., feature_dim)
         """
-        self._logger.info('Loading ' + self.cache_file_name)
+        self._logger.info("Loading " + self.cache_file_name)
         cat_data = np.load(self.cache_file_name)
-        x_train = cat_data['x_train']
-        y_train = cat_data['y_train']
-        x_test = cat_data['x_test']
-        y_test = cat_data['y_test']
-        x_val = cat_data['x_val']
-        y_val = cat_data['y_val']
-        self.adj_mx = cat_data['adj_mx']
-        self._logger.info("train\t" + "x: " + str(x_train.shape) + ", y: " + str(y_train.shape))
-        self._logger.info("eval\t" + "x: " + str(x_val.shape) + ", y: " + str(y_val.shape))
-        self._logger.info("test\t" + "x: " + str(x_test.shape) + ", y: " + str(y_test.shape))
-        self._logger.info("Generate rel file from data, shape=" + str(self.adj_mx.shape))
+        x_train = cat_data["x_train"]
+        y_train = cat_data["y_train"]
+        x_test = cat_data["x_test"]
+        y_test = cat_data["y_test"]
+        x_val = cat_data["x_val"]
+        y_val = cat_data["y_val"]
+        self.adj_mx = cat_data["adj_mx"]
+        self._logger.info(
+            "train\t" + "x: " + str(x_train.shape) + ", y: " + str(y_train.shape)
+        )
+        self._logger.info(
+            "eval\t" + "x: " + str(x_val.shape) + ", y: " + str(y_val.shape)
+        )
+        self._logger.info(
+            "test\t" + "x: " + str(x_test.shape) + ", y: " + str(y_test.shape)
+        )
+        self._logger.info(
+            "Generate rel file from data, shape=" + str(self.adj_mx.shape)
+        )
         return x_train, y_train, x_val, y_val, x_test, y_test
 
     def _generate_graph_with_data(self, data, len):
         data = data[:len, ...]
         len_time, num_nodes, feature_dim = data.shape[0], data.shape[1], data.shape[2]
         inputs = np.swapaxes(data, 1, 2).reshape(-1, num_nodes)  # m*n
-        self._logger.info("Start singular value decomposition, data.shape={}!".format(str(inputs.shape)))
+        self._logger.info(
+            "Start singular value decomposition, data.shape={}!".format(
+                str(inputs.shape)
+            )
+        )
         u, s, v = np.linalg.svd(inputs)  # u=(m*m), v=(n*n)
-        w = np.diag(s[:self.hidden_size]).dot(v[:self.hidden_size, :]).T  # n*hid
+        w = np.diag(s[: self.hidden_size]).dot(v[: self.hidden_size, :]).T  # n*hid
 
         support = None
-        if self.method == 'big':
+        if self.method == "big":
             self._logger.info("Start calculating adjacency matrix!")
-            graph = cdist(w, w, metric='euclidean')  # n*n
+            graph = cdist(w, w, metric="euclidean")  # n*n
             support = graph * -1 / np.std(graph) ** 2
             support = np.exp(support)  # n*n
-        elif self.method == 'small':
+        elif self.method == "small":
             support = w  # n*hid
 
         self._logger.info("Generate rel file from data, shape=" + str(support.shape))

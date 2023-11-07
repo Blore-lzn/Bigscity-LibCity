@@ -8,7 +8,7 @@ from gensim.models import Word2Vec
 from libcity.data.dataset import TrafficStatePointDataset
 
 
-class Graph():
+class Graph:
     def __init__(self, nx_G, is_directed, p, q):
         self.G = nx_G
         self.is_directed = is_directed
@@ -16,9 +16,9 @@ class Graph():
         self.q = q
 
     def node2vec_walk(self, walk_length, start_node):
-        '''
+        """
         Simulate a random walk starting from start node.
-        '''
+        """
         G = self.G
         alias_nodes = self.alias_nodes
         alias_edges = self.alias_edges
@@ -30,11 +30,16 @@ class Graph():
             cur_nbrs = sorted(G.neighbors(cur))
             if len(cur_nbrs) > 0:
                 if len(walk) == 1:
-                    walk.append(cur_nbrs[alias_draw(alias_nodes[cur][0], alias_nodes[cur][1])])
+                    walk.append(
+                        cur_nbrs[alias_draw(alias_nodes[cur][0], alias_nodes[cur][1])]
+                    )
                 else:
                     prev = walk[-2]
-                    next = cur_nbrs[alias_draw(alias_edges[(prev, cur)][0],
-                                               alias_edges[(prev, cur)][1])]
+                    next = cur_nbrs[
+                        alias_draw(
+                            alias_edges[(prev, cur)][0], alias_edges[(prev, cur)][1]
+                        )
+                    ]
                     walk.append(next)
             else:
                 break
@@ -42,25 +47,27 @@ class Graph():
         return walk
 
     def simulate_walks(self, num_walks, walk_length):
-        '''
+        """
         Repeatedly simulate random walks from each node.
-        '''
+        """
         G = self.G
         walks = []
         nodes = list(G.nodes())
-        print('Walk iteration:')
+        print("Walk iteration:")
         for walk_iter in range(num_walks):
-            print(str(walk_iter + 1), '/', str(num_walks))
+            print(str(walk_iter + 1), "/", str(num_walks))
             random.shuffle(nodes)
             for node in nodes:
-                walks.append(self.node2vec_walk(walk_length=walk_length, start_node=node))
+                walks.append(
+                    self.node2vec_walk(walk_length=walk_length, start_node=node)
+                )
 
         return walks
 
     def get_alias_edge(self, src, dst):
-        '''
+        """
         Get the alias edge setup lists for a given edge.
-        '''
+        """
         G = self.G
         p = self.p
         q = self.q
@@ -68,28 +75,32 @@ class Graph():
         unnormalized_probs = []
         for dst_nbr in sorted(G.neighbors(dst)):
             if dst_nbr == src:
-                unnormalized_probs.append(G[dst][dst_nbr]['weight'] / p)
+                unnormalized_probs.append(G[dst][dst_nbr]["weight"] / p)
             elif G.has_edge(dst_nbr, src):
-                unnormalized_probs.append(G[dst][dst_nbr]['weight'])
+                unnormalized_probs.append(G[dst][dst_nbr]["weight"])
             else:
-                unnormalized_probs.append(G[dst][dst_nbr]['weight'] / q)
+                unnormalized_probs.append(G[dst][dst_nbr]["weight"] / q)
         norm_const = sum(unnormalized_probs)
         normalized_probs = [float(u_prob) / norm_const for u_prob in unnormalized_probs]
 
         return alias_setup(normalized_probs)
 
     def preprocess_transition_probs(self):
-        '''
+        """
         Preprocessing of transition probabilities for guiding the random walks.
-        '''
+        """
         G = self.G
         is_directed = self.is_directed
 
         alias_nodes = {}
         for node in G.nodes():
-            unnormalized_probs = [G[node][nbr]['weight'] for nbr in sorted(G.neighbors(node))]
+            unnormalized_probs = [
+                G[node][nbr]["weight"] for nbr in sorted(G.neighbors(node))
+            ]
             norm_const = sum(unnormalized_probs)
-            normalized_probs = [float(u_prob) / norm_const for u_prob in unnormalized_probs]
+            normalized_probs = [
+                float(u_prob) / norm_const for u_prob in unnormalized_probs
+            ]
             alias_nodes[node] = alias_setup(normalized_probs)
 
         alias_edges = {}
@@ -109,12 +120,12 @@ class Graph():
 
 
 def alias_setup(probs):
-    '''
+    """
     Compute utility lists for non-uniform sampling from discrete distributions.
     Refer to
     https://hips.seas.harvard.edu/blog/2013/03/03/the-alias-method-efficient-sampling-with-many-discrete-outcomes/
     for details
-    '''
+    """
     K = len(probs)
     q = np.zeros(K)
     J = np.zeros(K, dtype=np.int)
@@ -143,9 +154,9 @@ def alias_setup(probs):
 
 
 def alias_draw(J, q):
-    '''
+    """
     Draw sample from a non-uniform discrete distribution using alias sampling.
-    '''
+    """
     K = len(J)
 
     kk = int(np.floor(np.random.rand() * K))
@@ -158,44 +169,85 @@ def alias_draw(J, q):
 def learn_embeddings(walks, dimensions, window_size, iter):
     walks = [list(map(str, walk)) for walk in walks]
     model = Word2Vec(
-        walks, vector_size=dimensions, window=window_size, min_count=0, sg=1,
-        workers=8, epochs=iter)
+        walks,
+        vector_size=dimensions,
+        window=window_size,
+        min_count=0,
+        sg=1,
+        workers=8,
+        epochs=iter,
+    )
     return model
 
 
 class GMANDataset(TrafficStatePointDataset):
-
     def __init__(self, config):
         super().__init__(config)
-        self.D = self.config.get('D', 64)
+        self.D = self.config.get("D", 64)
         self.points_per_hour = 3600 // self.time_intervals
-        self.add_day_in_week = self.config.get('add_day_in_week', False)
-        self.SE_config = {'is_directed': True, 'p': 2, 'q': 1, 'num_walks': 100,
-                          'walk_length': 80, 'dimensions': self.D, 'window_size': 10,
-                          'iter': 1000}
-        self.SE_config_str = 'SE_' + str(self.SE_config['is_directed']) + '_' + str(self.SE_config['p']) + \
-                             '_' + str(self.SE_config['q']) + '_' + str(self.SE_config['num_walks']) + \
-                             '_' + str(self.SE_config['walk_length']) + '_' + str(self.SE_config['dimensions']) + \
-                             '_' + str(self.SE_config['window_size']) + '_' + str(self.SE_config['iter'])
-        self.SE_cache_file = os.path.join('./libcity/cache/dataset_cache/',
-                                          'SE_based_{}.txt'.format(str(self.dataset) + '_' + self.SE_config_str))
+        self.add_day_in_week = self.config.get("add_day_in_week", False)
+        self.SE_config = {
+            "is_directed": True,
+            "p": 2,
+            "q": 1,
+            "num_walks": 100,
+            "walk_length": 80,
+            "dimensions": self.D,
+            "window_size": 10,
+            "iter": 1000,
+        }
+        self.SE_config_str = (
+            "SE_"
+            + str(self.SE_config["is_directed"])
+            + "_"
+            + str(self.SE_config["p"])
+            + "_"
+            + str(self.SE_config["q"])
+            + "_"
+            + str(self.SE_config["num_walks"])
+            + "_"
+            + str(self.SE_config["walk_length"])
+            + "_"
+            + str(self.SE_config["dimensions"])
+            + "_"
+            + str(self.SE_config["window_size"])
+            + "_"
+            + str(self.SE_config["iter"])
+        )
+        self.SE_cache_file = os.path.join(
+            "./libcity/cache/dataset_cache/",
+            "SE_based_{}.txt".format(str(self.dataset) + "_" + self.SE_config_str),
+        )
         self._generate_SE()
 
     def _generate_SE(self):
         #   SE: [N, D]([N, K * d])
         if not os.path.exists(self.SE_cache_file):
             nx_G = nx.from_numpy_matrix(self.adj_mx, create_using=nx.DiGraph())
-            G = Graph(nx_G, self.SE_config['is_directed'], self.SE_config['p'], self.SE_config['q'])
+            G = Graph(
+                nx_G,
+                self.SE_config["is_directed"],
+                self.SE_config["p"],
+                self.SE_config["q"],
+            )
             G.preprocess_transition_probs()
-            walks = G.simulate_walks(self.SE_config['num_walks'], self.SE_config['walk_length'])
-            model = learn_embeddings(walks, self.SE_config['dimensions'],
-                                     self.SE_config['window_size'], self.SE_config['iter'])
+            walks = G.simulate_walks(
+                self.SE_config["num_walks"], self.SE_config["walk_length"]
+            )
+            model = learn_embeddings(
+                walks,
+                self.SE_config["dimensions"],
+                self.SE_config["window_size"],
+                self.SE_config["iter"],
+            )
             model.wv.save_word2vec_format(self.SE_cache_file)
-        SE = np.zeros(shape=(self.num_nodes, self.SE_config['dimensions']), dtype=np.float32)
-        f = open(self.SE_cache_file, mode='r')
+        SE = np.zeros(
+            shape=(self.num_nodes, self.SE_config["dimensions"]), dtype=np.float32
+        )
+        f = open(self.SE_cache_file, mode="r")
         lines = f.readlines()
         for line in lines[1:]:
-            temp = line.split(' ')
+            temp = line.split(" ")
             index = int(temp[0])
             SE[index] = temp[1:]
         print(SE.shape)
@@ -210,8 +262,8 @@ class GMANDataset(TrafficStatePointDataset):
             dict: 包含数据集的相关特征的字典
         """
         data_feature = super().get_data_feature()
-        data_feature['SE'] = self.SE
-        data_feature['D'] = self.D
-        data_feature['points_per_hour'] = self.points_per_hour
-        data_feature['add_day_in_week'] = self.add_day_in_week
+        data_feature["SE"] = self.SE
+        data_feature["D"] = self.D
+        data_feature["points_per_hour"] = self.points_per_hour
+        data_feature["add_day_in_week"] = self.add_day_in_week
         return data_feature

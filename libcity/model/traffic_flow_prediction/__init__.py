@@ -41,5 +41,5 @@ __all__ = [
     "CRANN",
     "CONVGCNCommon",
     "DSAN",
-    "MultiSTGCnetCommon"
+    "MultiSTGCnetCommon",
 ]

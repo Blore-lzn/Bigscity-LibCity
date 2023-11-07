@@ -1,15 +1,22 @@
 import os
 import pandas as pd
 
-from libcity.data.dataset.trajectory_encoder.abstract_trajectory_encoder import AbstractTrajectoryEncoder
+from libcity.data.dataset.trajectory_encoder.abstract_trajectory_encoder import (
+    AbstractTrajectoryEncoder,
+)
 from libcity.utils import parse_time
 
-parameter_list = ['dataset', 'min_session_len', 'min_sessions', 'traj_encoder', 'cut_method',
-                  'window_size']
+parameter_list = [
+    "dataset",
+    "min_session_len",
+    "min_sessions",
+    "traj_encoder",
+    "cut_method",
+    "window_size",
+]
 
 
 class CARATrajectoryEncoder(AbstractTrajectoryEncoder):
-
     def __init__(self, config):
         super().__init__(config)
         self.uid = 0
@@ -17,18 +24,26 @@ class CARATrajectoryEncoder(AbstractTrajectoryEncoder):
         self.loc_id = 0
         self.id2locid = {}
         self.tim_max = 47  # 时间编码方式得改变
-        self.feature_dict = {'current_loc': 'int', 'current_tim': 'int',
-                             'target': 'int', 'target_tim': 'int', 'uid': 'int'
-                             }
-        parameters_str = ''
+        self.feature_dict = {
+            "current_loc": "int",
+            "current_tim": "int",
+            "target": "int",
+            "target_tim": "int",
+            "uid": "int",
+        }
+        parameters_str = ""
         for key in parameter_list:
             if key in self.config:
-                parameters_str += '_' + str(self.config[key])
+                parameters_str += "_" + str(self.config[key])
         self.cache_file_name = os.path.join(
-            './libcity/cache/dataset_cache/', 'trajectory_{}.json'.format(parameters_str))
-        self.dataset = self.config.get('dataset', '')
-        self.geo_file = self.config.get('geo_file', self.dataset)
-        self.poi_profile = pd.read_csv('./raw_data/{}/{}.geo'.format(self.dataset, self.geo_file))
+            "./libcity/cache/dataset_cache/",
+            "trajectory_{}.json".format(parameters_str),
+        )
+        self.dataset = self.config.get("dataset", "")
+        self.geo_file = self.config.get("geo_file", self.dataset)
+        self.poi_profile = pd.read_csv(
+            "./raw_data/{}/{}.geo".format(self.dataset, self.geo_file)
+        )
 
     def encode(self, uid, trajectories, negative_sample=None):
         """standard encoder use the same method as DeepMove
@@ -76,24 +91,21 @@ class CARATrajectoryEncoder(AbstractTrajectoryEncoder):
     def gen_data_feature(self):
         loc_pad = self.loc_id
         tim_pad = self.tim_max + 1
-        self.pad_item = {
-            'current_loc': loc_pad,
-            'current_tim': tim_pad
-        }
+        self.pad_item = {"current_loc": loc_pad, "current_tim": tim_pad}
         # 构建 poi 坐标字典
         poi_coor = {}
         for index, row in self.poi_profile.iterrows():
-            geo_id = row['geo_id']
-            coor = eval(row['coordinates'])
+            geo_id = row["geo_id"]
+            coor = eval(row["coordinates"])
             poi_coor[str(geo_id)] = coor
         self.data_feature = {
-            'loc_size': self.loc_id + 1,
-            'tim_size': self.tim_max + 2,
-            'uid_size': self.uid,
-            'loc_pad': loc_pad,
-            'tim_pad': tim_pad,
-            'id2locid': self.id2locid,
-            'poi_coor': poi_coor
+            "loc_size": self.loc_id + 1,
+            "tim_size": self.tim_max + 2,
+            "uid_size": self.uid,
+            "loc_pad": loc_pad,
+            "tim_pad": tim_pad,
+            "id2locid": self.id2locid,
+            "poi_coor": poi_coor,
         }
 
     def _time_encode(self, time):

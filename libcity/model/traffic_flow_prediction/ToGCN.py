@@ -14,13 +14,17 @@ class GraphConvolution(nn.Module):
         super(GraphConvolution, self).__init__()
         self.input_size = input_size
         self.output_size = output_size
-        self.weight = nn.Parameter(torch.zeros((input_size, output_size), device=device, dtype=dtype),
-                                   requires_grad=True)
-        self.bias = nn.Parameter(torch.zeros(output_size, device=device, dtype=dtype), requires_grad=True)
+        self.weight = nn.Parameter(
+            torch.zeros((input_size, output_size), device=device, dtype=dtype),
+            requires_grad=True,
+        )
+        self.bias = nn.Parameter(
+            torch.zeros(output_size, device=device, dtype=dtype), requires_grad=True
+        )
         self.init_parameters()
 
     def init_parameters(self):
-        stdv = 1. / math.sqrt(self.weight.size(1))
+        stdv = 1.0 / math.sqrt(self.weight.size(1))
         self.weight.data.uniform_(-stdv, stdv)
         self.bias.data.uniform_(-stdv, stdv)
 
@@ -55,13 +59,15 @@ class Encoder(nn.Module):
         super(Encoder, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.gcn = GCN(input_size=feature_size, hidden_size=128, output_size=1, device=device)
+        self.gcn = GCN(
+            input_size=feature_size, hidden_size=128, output_size=1, device=device
+        )
         self.lstm = nn.LSTM(
             input_size=self.input_size,
             hidden_size=self.hidden_size,
             num_layers=2,
             batch_first=True,
-            dropout=0.5
+            dropout=0.5,
         )
         self.device = device
 
@@ -78,7 +84,9 @@ class Encoder(nn.Module):
         return encoder_out, encoder_states
 
     def init_hidden(self, x):
-        return torch.zeros((2, x.size(0), self.hidden_size), device=self.device, dtype=dtype)
+        return torch.zeros(
+            (2, x.size(0), self.hidden_size), device=self.device, dtype=dtype
+        )
 
 
 class Decoder(nn.Module):
@@ -92,7 +100,7 @@ class Decoder(nn.Module):
             hidden_size=self.hidden_size,
             num_layers=2,
             batch_first=True,
-            dropout=0.5
+            dropout=0.5,
         )
         self.dense = nn.Linear(self.hidden_size, self.output_size)
         self.device = device
@@ -108,7 +116,9 @@ class Decoder(nn.Module):
         return decoder_out, decoder_states
 
     def init_hidden(self, x):
-        return torch.zeros((2, x.size(0), self.hidden_size), device=self.device, dtype=dtype)
+        return torch.zeros(
+            (2, x.size(0), self.hidden_size), device=self.device, dtype=dtype
+        )
 
 
 class ToGCN(AbstractTrafficStateModel):
@@ -116,50 +126,66 @@ class ToGCN(AbstractTrafficStateModel):
         super().__init__(config, data_feature)
         torch.autograd.set_detect_anomaly(True)
         # get data feature
-        self.device = config.get('device', torch.device('cpu'))
+        self.device = config.get("device", torch.device("cpu"))
         # print('self.device=', self.device)
-        self.adj_mx = torch.tensor(self.data_feature.get('adj_mx'), device=self.device)
+        self.adj_mx = torch.tensor(self.data_feature.get("adj_mx"), device=self.device)
         # print('self.adj_mx=', self.adj_mx)
-        self.num_nodes = self.data_feature.get('num_nodes', 1)
+        self.num_nodes = self.data_feature.get("num_nodes", 1)
         # print('self.num_nodes=', self.num_nodes)
-        self.feature_dim = self.data_feature.get('feature_dim', 1)
+        self.feature_dim = self.data_feature.get("feature_dim", 1)
         # print('self.feature_dim=', self.feature_dim)
-        self.output_dim = self.data_feature.get('output_dim', 1)
+        self.output_dim = self.data_feature.get("output_dim", 1)
         # print('self.output_dim=', self.output_dim)
-        self._scaler = self.data_feature.get('scaler')
+        self._scaler = self.data_feature.get("scaler")
         # print('self._scaler', self._scaler)
 
         # get model config
-        self.hidden_size = config.get('hidden_size', 128)
+        self.hidden_size = config.get("hidden_size", 128)
         # print('self.hidden_size=', self.hidden_size)
-        self.decoder_t = config.get('decoder_t', 3)
+        self.decoder_t = config.get("decoder_t", 3)
         # print('self.decoder_t=', self.decoder_t)
-        self.teacher_forcing_ratio = config.get('teacher_forcing_ratio', 0.5)
+        self.teacher_forcing_ratio = config.get("teacher_forcing_ratio", 0.5)
         # print('self.teacher_forcing_ratio=', self.teacher_forcing_ratio)
 
         # define the model structure
-        self.encoder = Encoder(self.num_nodes, self.feature_dim, self.hidden_size, self.device)
-        self.decoder = Decoder(self.num_nodes * self.output_dim,
-                               self.hidden_size, self.num_nodes * self.output_dim, self.device)
-        self.linear = nn.Linear(in_features=self.feature_dim, out_features=self.output_dim)
+        self.encoder = Encoder(
+            self.num_nodes, self.feature_dim, self.hidden_size, self.device
+        )
+        self.decoder = Decoder(
+            self.num_nodes * self.output_dim,
+            self.hidden_size,
+            self.num_nodes * self.output_dim,
+            self.device,
+        )
+        self.linear = nn.Linear(
+            in_features=self.feature_dim, out_features=self.output_dim
+        )
 
     def forward(self, batch):
-        input_tensor = batch['X']
-        target_tensor = batch['y']
-        timestep_1 = input_tensor.shape[1]  # Length of input time interval (10 min each)
-        timestep_2 = target_tensor.shape[1]  # Length of output time interval (10 min each)
+        input_tensor = batch["X"]
+        target_tensor = batch["y"]
+        timestep_1 = input_tensor.shape[
+            1
+        ]  # Length of input time interval (10 min each)
+        timestep_2 = target_tensor.shape[
+            1
+        ]  # Length of output time interval (10 min each)
 
         # Encode history flow map
         encoder_hidden = None
         for ei in range(timestep_1):
             encoder_input = input_tensor[:, ei]
-            encoder_output, encoder_hidden = self.encoder(encoder_input, self.adj_mx, encoder_hidden)
+            encoder_output, encoder_hidden = self.encoder(
+                encoder_input, self.adj_mx, encoder_hidden
+            )
 
         # Decode to predict future flow map
         decoder_hidden = encoder_hidden
 
         for di in range(self.decoder_t):
-            decoder_input = self.linear(input_tensor[:, timestep_1 - (self.decoder_t - di) - 1].clone())
+            decoder_input = self.linear(
+                input_tensor[:, timestep_1 - (self.decoder_t - di) - 1].clone()
+            )
             decoder_output, decoder_hidden = self.decoder(decoder_input, decoder_hidden)
 
         decoder_input = self.linear(input_tensor[:, timestep_1 - 1].clone())
@@ -172,12 +198,16 @@ class ToGCN(AbstractTrafficStateModel):
         decoder_outputs = []
         if use_teacher_forcing:
             for di in range(timestep_2):
-                decoder_output, decoder_hidden = self.decoder(decoder_input, decoder_hidden)
+                decoder_output, decoder_hidden = self.decoder(
+                    decoder_input, decoder_hidden
+                )
                 decoder_outputs.append(decoder_output)
                 decoder_input = self.linear(target_tensor[:, di].clone())
         else:
             for di in range(timestep_2):
-                decoder_output, decoder_hidden = self.decoder(decoder_input, decoder_hidden)
+                decoder_output, decoder_hidden = self.decoder(
+                    decoder_input, decoder_hidden
+                )
                 decoder_outputs.append(decoder_output)
                 decoder_input = decoder_output
         y_preds = torch.stack(decoder_outputs, dim=1)  # multi-step prediction
@@ -188,10 +218,12 @@ class ToGCN(AbstractTrafficStateModel):
         return self.forward(batch)
 
     def calculate_loss(self, batch):
-        y_true = batch['y']  # ground-truth value
+        y_true = batch["y"]  # ground-truth value
         y_predicted = self.predict(batch)  # prediction results
         # denormalization the value
-        y_true = self._scaler.inverse_transform(y_true[..., :self.output_dim])
-        y_predicted = self._scaler.inverse_transform(y_predicted[..., :self.output_dim])
+        y_true = self._scaler.inverse_transform(y_true[..., : self.output_dim])
+        y_predicted = self._scaler.inverse_transform(
+            y_predicted[..., : self.output_dim]
+        )
         # call the mask_mae loss function defined in `loss.py`
         return loss.masked_mae_torch(y_predicted, y_true, 0)

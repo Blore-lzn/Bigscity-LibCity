@@ -8,19 +8,27 @@ from libcity.model import loss
 
 def split_cpt(value, cpt):
     if not isinstance(value, torch.Tensor):
-        raise ValueError('Parameter Value should be a Tensor.')
+        raise ValueError("Parameter Value should be a Tensor.")
     scale = int(value.size()[1]) // sum(cpt)
     split_list = []
     for i in cpt:
         if i > 0:
             split_list.append(i * scale)
     if len(split_list) <= 0:
-        raise ValueError('Get empty split_list.')
+        raise ValueError("Get empty split_list.")
     return torch.split(value, split_size_or_sections=split_list, dim=1)
 
 
 class ConcatConv(nn.Module):
-    def __init__(self, in_channels1, in_channels2, out_channels, inter_channels, relu_conv=False, seq_len=None):
+    def __init__(
+        self,
+        in_channels1,
+        in_channels2,
+        out_channels,
+        inter_channels,
+        relu_conv=False,
+        seq_len=None,
+    ):
         super().__init__()
         self.in_channels1 = in_channels1
         self.in_channels2 = in_channels2
@@ -31,7 +39,7 @@ class ConcatConv(nn.Module):
         self.seq_len = seq_len
         if seq_len is not None:
             self.in_channels //= seq_len
-            self.out_channels //= (seq_len)
+            self.out_channels //= seq_len
 
             self.model = nn.ModuleList()
             for _ in range(self.seq_len):
@@ -69,7 +77,9 @@ class ConcatConv(nn.Module):
 
 
 class ConvGate(nn.Module):
-    def __init__(self, in_channels, height, width, lstm_channels=16, peephole_conn=True):
+    def __init__(
+        self, in_channels, height, width, lstm_channels=16, peephole_conn=True
+    ):
         super().__init__()
         self.in_channels = in_channels
         self.height = height
@@ -83,13 +93,15 @@ class ConvGate(nn.Module):
         if peephole_conn:
             self.w = nn.Parameter(torch.Tensor(lstm_channels, height, width))
             self.b = nn.Parameter(torch.Tensor(lstm_channels, 1, 1))
-            nn.init.kaiming_normal_(self.w.data, a=0, mode='fan_in')
+            nn.init.kaiming_normal_(self.w.data, a=0, mode="fan_in")
 
     def _linear(self, x):
         return x * self.w + self.b
 
     def _conv_layer(self, in_channels):
-        return nn.Conv2d(in_channels, self.lstm_channels, 3, 1, 1, bias=True)  # has bias
+        return nn.Conv2d(
+            in_channels, self.lstm_channels, 3, 1, 1, bias=True
+        )  # has bias
 
     def forward(self, input, state):
         hidden_state, cell_state = state
@@ -142,7 +154,9 @@ class ConvGRUCell(nn.Module):
         self.h_conv = self._conv_layer(in_channels + lstm_channels)
 
     def _conv_layer(self, in_channels):
-        return nn.Conv2d(in_channels, self.lstm_channels, 3, 1, 1, bias=True)  # has bias
+        return nn.Conv2d(
+            in_channels, self.lstm_channels, 3, 1, 1, bias=True
+        )  # has bias
 
     def forward(self, input, state):
         hidden_pre = state
@@ -156,9 +170,20 @@ class ConvGRUCell(nn.Module):
 
 
 class ConvLSTM(nn.Module):
-    def __init__(self, in_channels, height, width, lstm_channels=16, all_hidden=False,
-                 mode='merge', cpt=None, dropout_rate=0.5, last_conv=False,
-                 conv_channels=None, gru=False):
+    def __init__(
+        self,
+        in_channels,
+        height,
+        width,
+        lstm_channels=16,
+        all_hidden=False,
+        mode="merge",
+        cpt=None,
+        dropout_rate=0.5,
+        last_conv=False,
+        conv_channels=None,
+        gru=False,
+    ):
         super().__init__()
 
         self.in_channels = in_channels
@@ -179,9 +204,11 @@ class ConvLSTM(nn.Module):
             self._lstm_cell = ConvLSTMCell(in_channels, height, width, lstm_channels)
         if last_conv:
             if self.conv_channels is None:
-                raise ValueError('Parameter Out Channel is needed to enable last_conv')
+                raise ValueError("Parameter Out Channel is needed to enable last_conv")
 
-            self._conv_layer = nn.Conv2d(lstm_channels, conv_channels, 3, 1, 1, bias=True)
+            self._conv_layer = nn.Conv2d(
+                lstm_channels, conv_channels, 3, 1, 1, bias=True
+            )
 
         if dropout_rate > 0:
             self._dropout_layer = nn.Dropout2d(dropout_rate)
@@ -191,8 +218,10 @@ class ConvLSTM(nn.Module):
         if self.gru:
             state = torch.zeros(n_in, self.lstm_channels, h_in, w_in).cuda()
         else:
-            state = (torch.zeros(n_in, self.lstm_channels, h_in, w_in).cuda(),
-                     torch.zeros(n_in, self.lstm_channels, h_in, w_in).cuda())
+            state = (
+                torch.zeros(n_in, self.lstm_channels, h_in, w_in).cuda(),
+                torch.zeros(n_in, self.lstm_channels, h_in, w_in).cuda(),
+            )
         seq = torch.split(inputs, self.in_channels, dim=1)
         hiddent_list = []
         for idx, input in enumerate(seq[::-1]):  # using reverse order
@@ -204,7 +233,9 @@ class ConvLSTM(nn.Module):
 
             if self.last_conv:
                 if self.conv_channels is None:
-                    raise ValueError('Parameter Out Channel is needed to enable last_conv')
+                    raise ValueError(
+                        "Parameter Out Channel is needed to enable last_conv"
+                    )
                 hidden = self._conv_layer(hidden)
 
             hiddent_list.append(hidden)
@@ -218,25 +249,35 @@ class ConvLSTM(nn.Module):
     def forward(self, inputs):
         if self.dropout_rate > 0:
             inputs = self._dropout_layer(inputs)
-        if self.mode == 'merge':
+        if self.mode == "merge":
             output = self.lstm_layer(inputs)
             return output
-        elif self.mode == 'cpt':
+        elif self.mode == "cpt":
             if self.cpt is None:
-                raise ValueError('Parameter \'cpt\' is required in mode \'cpt\' of ConvLSTM')
+                raise ValueError(
+                    "Parameter 'cpt' is required in mode 'cpt' of ConvLSTM"
+                )
             cpt_seq = split_cpt(inputs, self.cpt)
-            output_list = [
-                self.lstm_layer(input_) for input_ in cpt_seq
-            ]
+            output_list = [self.lstm_layer(input_) for input_ in cpt_seq]
             output = torch.cat(output_list, 1)
             return output
         else:
-            raise ('Invalid LSTM mode: ' + self.mode)
+            raise ("Invalid LSTM mode: " + self.mode)
 
 
 class ExtNN(nn.Module):
-    def __init__(self, in_features, out_height, out_width, out_channels,
-                 inter_features=10, map=True, relu=True, mode='inter', dropout_rate=0):
+    def __init__(
+        self,
+        in_features,
+        out_height,
+        out_width,
+        out_channels,
+        inter_features=10,
+        map=True,
+        relu=True,
+        mode="inter",
+        dropout_rate=0,
+    ):
         super().__init__()
         self.in_features = in_features
         self.out_height = out_height
@@ -267,14 +308,16 @@ class ExtNN(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        if self.mode == 'inter':
+        if self.mode == "inter":
             inputs = torch.split(x, 1, dim=1)
             exts = []
             for input in inputs:
                 input = input.squeeze(1)
                 out = self.model(input)
                 if self.map:
-                    out = out.view(-1, self.out_channels, self.out_height, self.out_width)
+                    out = out.view(
+                        -1, self.out_channels, self.out_height, self.out_width
+                    )
                 exts.append(out)
             return torch.cat(exts, 1)
         else:
@@ -313,8 +356,16 @@ class ResUnit(nn.Module):
 
 
 class ResNN(nn.Module):
-    def __init__(self, in_channels, out_channels, inter_channels, repetation=1,
-                 bnmode=True, splitmode='split', cpt=None):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        inter_channels,
+        repetation=1,
+        bnmode=True,
+        splitmode="split",
+        cpt=None,
+    ):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -324,7 +375,7 @@ class ResNN(nn.Module):
 
         self.inlist = []
         self.resblocks = nn.ModuleList()
-        if splitmode == 'split':
+        if splitmode == "split":
             seq_num = sum(cpt)
             inscale = int(in_channels) // seq_num
             outscale = int(out_channels) // seq_num
@@ -332,7 +383,7 @@ class ResNN(nn.Module):
             for i in range(seq_num):
                 self.inlist.append(inscale)
                 self.resblocks.append(resblock)
-        elif splitmode == 'split-chans':
+        elif splitmode == "split-chans":
             seq_num = sum(cpt) * 2
             inscale = int(in_channels) // seq_num
             outscale = int(out_channels) // seq_num
@@ -340,18 +391,20 @@ class ResNN(nn.Module):
             for i in range(seq_num):
                 self.inlist.append(inscale)
                 self.resblocks.append(resblock)
-        elif splitmode == 'concat':
+        elif splitmode == "concat":
             self.inlist.append(in_channels)
             self.resblocks.append(self.residual_block(in_channels, out_channels))
-        elif splitmode == 'cpt':
+        elif splitmode == "cpt":
             seq_num = sum(cpt)
             inscale = int(in_channels) // seq_num
             outscale = int(out_channels) // seq_num
             for i in cpt:
                 if i > 0:
                     self.inlist.append(i * inscale)
-                    self.resblocks.append(self.residual_block(i * inscale, i * outscale))
-        elif splitmode == 'cpt-sameoutput':
+                    self.resblocks.append(
+                        self.residual_block(i * inscale, i * outscale)
+                    )
+        elif splitmode == "cpt-sameoutput":
             seq_num = sum(cpt)
             inscale = int(in_channels) // seq_num
             for i in cpt:
@@ -359,7 +412,7 @@ class ResNN(nn.Module):
                     self.inlist.append(i * inscale)
                     self.resblocks.append(self.residual_block(i * inscale, 2))
         else:
-            raise ValueError('Invalid ResNN split mode')
+            raise ValueError("Invalid ResNN split mode")
 
     def residual_block(self, in_channels, out_channels):
         layers = []
@@ -374,7 +427,7 @@ class ResNN(nn.Module):
     def forward(self, x):
         inputs = torch.split(x, split_size_or_sections=self.inlist, dim=1)
         if len(inputs) != len(self.resblocks):
-            raise ValueError('Input length and network in_channels are inconsistent')
+            raise ValueError("Input length and network in_channels are inconsistent")
 
         outputs = []
         for i in range(len(inputs)):
@@ -386,28 +439,30 @@ class ResNN(nn.Module):
 class ACFMCommon(AbstractTrafficStateModel):
     def __init__(self, config, data_feature):
         super().__init__(config, data_feature)
-        self._scaler = self.data_feature.get('scaler')
-        self.adj_mx = self.data_feature.get('adj_mx')
-        self.num_nodes = self.data_feature.get('num_nodes', 1)
-        self.feature_dim = self.data_feature.get('feature_dim', 2)
-        self.ext_dim = self.data_feature.get('ext_dim', 0)
-        self.output_dim = self.data_feature.get('output_dim', 2)
-        self.len_row = self.data_feature.get('len_row', 32)
-        self.len_column = self.data_feature.get('len_column', 32)
+        self._scaler = self.data_feature.get("scaler")
+        self.adj_mx = self.data_feature.get("adj_mx")
+        self.num_nodes = self.data_feature.get("num_nodes", 1)
+        self.feature_dim = self.data_feature.get("feature_dim", 2)
+        self.ext_dim = self.data_feature.get("ext_dim", 0)
+        self.output_dim = self.data_feature.get("output_dim", 2)
+        self.len_row = self.data_feature.get("len_row", 32)
+        self.len_column = self.data_feature.get("len_column", 32)
         self._logger = getLogger()
 
-        self.res_repetation = config.get('res_repetation', 12)
-        self.res_nbfilter = config.get('res_nbfilter', 16)
-        self.res_bn = config.get('res_bn', True)
-        self.res_split_mode = config.get('res_split_mode', 'split')  # 'split', 'split-chans', 'cpt', 'concat', 'none'
-        self.first_extnn_inter_channels = config.get('first_extnn_inter_channels', 40)
-        self.first_extnn_dropout = config.get('first_extnn_dropout', 0.5)
-        self.merge_mode = config.get('merge_mode', 'fuse')  # 'LSTM', 'fuse'
-        self.lstm_channels = config.get('lstm_channels', 16)
-        self.lstm_dropout = config.get('lstm_dropout', 0)
-        self.input_window = config.get('input_window', 1)
-        self.output_window = config.get('output_window', 1)
-        self.device = config.get('device', torch.device('cpu'))
+        self.res_repetation = config.get("res_repetation", 12)
+        self.res_nbfilter = config.get("res_nbfilter", 16)
+        self.res_bn = config.get("res_bn", True)
+        self.res_split_mode = config.get(
+            "res_split_mode", "split"
+        )  # 'split', 'split-chans', 'cpt', 'concat', 'none'
+        self.first_extnn_inter_channels = config.get("first_extnn_inter_channels", 40)
+        self.first_extnn_dropout = config.get("first_extnn_dropout", 0.5)
+        self.merge_mode = config.get("merge_mode", "fuse")  # 'LSTM', 'fuse'
+        self.lstm_channels = config.get("lstm_channels", 16)
+        self.lstm_dropout = config.get("lstm_dropout", 0)
+        self.input_window = config.get("input_window", 1)
+        self.output_window = config.get("output_window", 1)
+        self.device = config.get("device", torch.device("cpu"))
 
         self.resnn = ResNN(
             in_channels=self.output_dim * self.input_window,
@@ -416,7 +471,7 @@ class ACFMCommon(AbstractTrafficStateModel):
             repetation=self.res_repetation,
             bnmode=self.res_bn,
             splitmode=self.res_split_mode,
-            cpt=[self.input_window, 0, 0]
+            cpt=[self.input_window, 0, 0],
         )
 
         self.conv_lstm = ConvLSTM(
@@ -425,10 +480,10 @@ class ACFMCommon(AbstractTrafficStateModel):
             width=self.len_column,
             lstm_channels=self.lstm_channels,
             all_hidden=True,
-            mode='cpt',
+            mode="cpt",
             cpt=[self.input_window, 0, 0],
             dropout_rate=self.lstm_dropout,
-            last_conv=False
+            last_conv=False,
         )
 
         self.concat_conv_c = ConcatConv(
@@ -437,7 +492,7 @@ class ACFMCommon(AbstractTrafficStateModel):
             out_channels=self.lstm_channels * self.input_window,
             inter_channels=self.lstm_channels,
             relu_conv=True,
-            seq_len=self.input_window
+            seq_len=self.input_window,
         )
 
         self.conv_lstm_c = ConvLSTM(
@@ -446,7 +501,7 @@ class ACFMCommon(AbstractTrafficStateModel):
             width=self.len_column,
             lstm_channels=self.lstm_channels,
             all_hidden=False,
-            mode='merge',
+            mode="merge",
             dropout_rate=self.lstm_dropout,
             last_conv=True,
             conv_channels=2,
@@ -458,7 +513,7 @@ class ACFMCommon(AbstractTrafficStateModel):
             width=self.len_column,
             lstm_channels=self.lstm_channels,
             all_hidden=False,
-            mode='merge',
+            mode="merge",
             dropout_rate=self.lstm_dropout,
             last_conv=True,
             conv_channels=2,
@@ -471,8 +526,8 @@ class ACFMCommon(AbstractTrafficStateModel):
                 out_width=self.len_column,
                 out_channels=self.lstm_channels,
                 inter_features=self.first_extnn_inter_channels,
-                mode='inter',
-                dropout_rate=self.first_extnn_dropout
+                mode="inter",
+                dropout_rate=self.first_extnn_dropout,
             )
             self.time_aware_extnn = ExtNN(
                 in_features=self.ext_dim,
@@ -482,13 +537,17 @@ class ACFMCommon(AbstractTrafficStateModel):
                 inter_features=32,
                 map=False,
                 relu=False,
-                mode='last'
+                mode="last",
             )
 
     def forward(self, batch):
-        x = batch['X'][:, :, :, :, :self.output_dim]  # (batch_size, input_window, len_row, len_column, output_dim)
-        x_ext = batch['X'][:, :, 0, 0, self.output_dim:]  # (batch_size, input_window, ext_dim)
-        y_ext = batch['X'][:, -1, 0, 0, :self.output_dim:]  # (batch_size, ext_dim)
+        x = batch["X"][
+            :, :, :, :, : self.output_dim
+        ]  # (batch_size, input_window, len_row, len_column, output_dim)
+        x_ext = batch["X"][
+            :, :, 0, 0, self.output_dim :
+        ]  # (batch_size, input_window, ext_dim)
+        y_ext = batch["X"][:, -1, 0, 0, : self.output_dim :]  # (batch_size, ext_dim)
 
         batch_size, len_time, len_row, len_column, input_dim = x.shape
         assert len_row == self.len_row
@@ -496,29 +555,35 @@ class ACFMCommon(AbstractTrafficStateModel):
         assert len_time == self.input_window
         assert input_dim == self.output_dim
 
-        x = x.contiguous().view(batch_size, len_time * input_dim, len_row, len_column).to(self.device)
+        x = (
+            x.contiguous()
+            .view(batch_size, len_time * input_dim, len_row, len_column)
+            .to(self.device)
+        )
 
-        features = self.resnn(x)   # (batch_size, lstm_channels * input_window, h, w)
+        features = self.resnn(x)  # (batch_size, lstm_channels * input_window, h, w)
         if self.ext_dim > 0:
-            ext = self.extnn(x_ext)    # (batch_size, lstm_channels * input_window, h, w)
-            print('ext', ext.shape)
-            print('features', features.shape)
-            features = features + ext  # (batch_size, lstm_channels * input_window, h, w)
+            ext = self.extnn(x_ext)  # (batch_size, lstm_channels * input_window, h, w)
+            print("ext", ext.shape)
+            print("features", features.shape)
+            features = (
+                features + ext
+            )  # (batch_size, lstm_channels * input_window, h, w)
 
         # calc attention using Conv-LSTM
         # (batch_size, lstm_channels * input_window, h, w)
         hidden_list = self.conv_lstm(features)
 
         # (batch_size, lstm_channels * input_window, h, w)
-        hidden_list_c = hidden_list[:, :self.lstm_channels * self.input_window]
-        features_c = features[:, :self.lstm_channels * self.input_window]
+        hidden_list_c = hidden_list[:, : self.lstm_channels * self.input_window]
+        features_c = features[:, : self.lstm_channels * self.input_window]
         attention_c = self.concat_conv_c(features_c, hidden_list_c)
         phase_c = features_c * (1 + attention_c)
         pred_c = self.conv_lstm_c(phase_c)  # (batch_size, 2, h, w)
 
         if self.ext_dim > 0:
             time_aware = self.time_aware_extnn(y_ext)  # (batch_size, 1)
-            self.time_aware_c = torch.sigmoid(time_aware)       # (batch_size, 1)
+            self.time_aware_c = torch.sigmoid(time_aware)  # (batch_size, 1)
             time_aware_c = self.time_aware_c.view(-1, 1, 1, 1)  # (batch_size, 1, 1, 1)
             pred = time_aware_c * pred_c  # (batch_size, 2, h, w)
         else:
@@ -529,25 +594,30 @@ class ACFMCommon(AbstractTrafficStateModel):
         return h
 
     def calculate_loss(self, batch):
-        y_true = batch['y']
+        y_true = batch["y"]
         y_predicted = self.predict(batch)
-        y_true = self._scaler.inverse_transform(y_true[..., :self.output_dim])
-        y_predicted = self._scaler.inverse_transform(y_predicted[..., :self.output_dim])
+        y_true = self._scaler.inverse_transform(y_true[..., : self.output_dim])
+        y_predicted = self._scaler.inverse_transform(
+            y_predicted[..., : self.output_dim]
+        )
         return loss.masked_mse_torch(y_predicted, y_true)
 
     def predict(self, batch):
         # 多步预测
-        x = batch['X']  # (batch_size, input_window, len_row, len_column, feature_dim)
-        y = batch['y']  # (batch_size, input_window, len_row, len_column, feature_dim)
+        x = batch["X"]  # (batch_size, input_window, len_row, len_column, feature_dim)
+        y = batch["y"]  # (batch_size, input_window, len_row, len_column, feature_dim)
         y_preds = []
         x_ = x.clone()
         for i in range(self.output_window):
-            batch_tmp = {'X': x_}
-            y_ = self.forward(batch_tmp)  # (batch_size, 1, len_row, len_column, output_dim)
+            batch_tmp = {"X": x_}
+            y_ = self.forward(
+                batch_tmp
+            )  # (batch_size, 1, len_row, len_column, output_dim)
             y_preds.append(y_.clone())
             if y_.shape[-1] < x_.shape[-1]:  # output_dim < feature_dim
-                y_ = torch.cat([y_, y[:, i:i + 1, :, :, self.output_dim:]], dim=-1)
+                y_ = torch.cat([y_, y[:, i : i + 1, :, :, self.output_dim :]], dim=-1)
             x_ = torch.cat([x_[:, 1:, :, :, :], y_], dim=1)
-        y_preds = torch.cat(y_preds, dim=1)  # (batch_size, output_length, len_row, len_column, output_dim)
+        y_preds = torch.cat(
+            y_preds, dim=1
+        )  # (batch_size, output_length, len_row, len_column, output_dim)
         return y_preds
-

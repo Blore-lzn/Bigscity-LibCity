@@ -50,7 +50,7 @@ def get_cheb_polynomial(l_tilde, k):
     return cheb_polynomials
 
 
-def get_supports_matrix(adj_mx, filter_type='laplacian', undirected=True):
+def get_supports_matrix(adj_mx, filter_type="laplacian", undirected=True):
     """
     选择不同类别的拉普拉斯
 
@@ -64,7 +64,9 @@ def get_supports_matrix(adj_mx, filter_type='laplacian', undirected=True):
     """
     supports = []
     if filter_type == "laplacian":
-        supports.append(calculate_scaled_laplacian(adj_mx, lambda_max=None, undirected=undirected))
+        supports.append(
+            calculate_scaled_laplacian(adj_mx, lambda_max=None, undirected=undirected)
+        )
     elif filter_type == "random_walk":
         supports.append(calculate_random_walk_matrix(adj_mx).T)
     elif filter_type == "dual_random_walk":
@@ -89,9 +91,12 @@ def calculate_normalized_laplacian(adj):
     adj = sp.coo_matrix(adj)
     d = np.array(adj.sum(1))
     d_inv_sqrt = np.power(d, -0.5).flatten()
-    d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0.
+    d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0.0
     d_mat_inv_sqrt = sp.diags(d_inv_sqrt)
-    normalized_laplacian = sp.eye(adj.shape[0]) - adj.dot(d_mat_inv_sqrt).transpose().dot(d_mat_inv_sqrt).tocoo()
+    normalized_laplacian = (
+        sp.eye(adj.shape[0])
+        - adj.dot(d_mat_inv_sqrt).transpose().dot(d_mat_inv_sqrt).tocoo()
+    )
     return normalized_laplacian
 
 
@@ -109,7 +114,7 @@ def calculate_random_walk_matrix(adj_mx):
     adj_mx = sp.coo_matrix(adj_mx)
     d = np.array(adj_mx.sum(1))
     d_inv = np.power(d, -1).flatten()
-    d_inv[np.isinf(d_inv)] = 0.
+    d_inv[np.isinf(d_inv)] = 0.0
     d_mat_inv = sp.diags(d_inv)
     random_walk_mx = d_mat_inv.dot(adj_mx).tocoo()
     return random_walk_mx
@@ -132,13 +137,18 @@ def calculate_scaled_laplacian(adj_mx, lambda_max=2, undirected=True):
         bigger = adj_mx > adj_mx.T
         smaller = adj_mx < adj_mx.T
         notequall = adj_mx != adj_mx.T
-        adj_mx = adj_mx - adj_mx.multiply(notequall) + adj_mx.multiply(bigger) + adj_mx.T.multiply(smaller)
+        adj_mx = (
+            adj_mx
+            - adj_mx.multiply(notequall)
+            + adj_mx.multiply(bigger)
+            + adj_mx.T.multiply(smaller)
+        )
     lap = calculate_normalized_laplacian(adj_mx)
     if lambda_max is None:
-        lambda_max, _ = linalg.eigsh(lap, 1, which='LM')
+        lambda_max, _ = linalg.eigsh(lap, 1, which="LM")
         lambda_max = lambda_max[0]
     lap = sp.csr_matrix(lap)
     m, _ = lap.shape
-    identity = sp.identity(m, format='csr', dtype=lap.dtype)
+    identity = sp.identity(m, format="csr", dtype=lap.dtype)
     lap = (2 / lambda_max * lap) - identity
     return lap.astype(np.float32).tocoo()

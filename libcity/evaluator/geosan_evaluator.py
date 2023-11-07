@@ -8,23 +8,26 @@ from libcity.evaluator.abstract_evaluator import AbstractEvaluator
 
 
 class GeoSANEvaluator(AbstractEvaluator):
-
     def __init__(self, config):
-        self.metrics = config['evaluator_config']['metrics']  # 评估指标, only contains hr and ndcg
-        self.topk = config['evaluator_config']['topk']
-        self.num_neg = config['executor_config']['test']['num_negative_samples']
+        self.metrics = config["evaluator_config"][
+            "metrics"
+        ]  # 评估指标, only contains hr and ndcg
+        self.topk = config["evaluator_config"]["topk"]
+        self.num_neg = config["executor_config"]["test"]["num_negative_samples"]
         self.cnter = Counter()
         self.result = {}
-        self.allowed_metrics = ['hr', 'ndcg']
+        self.allowed_metrics = ["hr", "ndcg"]
         self._check_config()
 
     def _check_config(self):
         if not isinstance(self.metrics, list):
-            raise TypeError('Evaluator type is not list')
+            raise TypeError("Evaluator type is not list")
         for i in self.metrics:
             if i.lower() not in self.allowed_metrics:
-                raise ValueError('the metric is not allowed in \
-                    TrajLocPredEvaluator')
+                raise ValueError(
+                    "the metric is not allowed in \
+                    TrajLocPredEvaluator"
+                )
 
     def collect(self, batch):
         """
@@ -51,10 +54,10 @@ class GeoSANEvaluator(AbstractEvaluator):
         ndcg = ndcg * array
         ndcg = ndcg.cumsum() / hr.max()
         hr = hr / hr.max()
-        if 'NDCG' in self.metrics:
-            self.result[f'NDCG@{self.topk}'] = float(ndcg[self.topk-1])
-        if 'HR' in self.metrics:
-            self.result[f'HR@{self.topk}'] = float(hr[self.topk-1])
+        if "NDCG" in self.metrics:
+            self.result[f"NDCG@{self.topk}"] = float(ndcg[self.topk - 1])
+        if "HR" in self.metrics:
+            self.result[f"HR@{self.topk}"] = float(hr[self.topk - 1])
 
     def save_result(self, save_path, filename=None):
         """
@@ -69,11 +72,9 @@ class GeoSANEvaluator(AbstractEvaluator):
             os.makedirs(save_path, exist_ok=True)
         if filename is None:
             # 使用时间戳
-            filename = time.strftime(
-                "%Y_%m_%d_%H_%M_%S", time.localtime(time.time()))
-        print('evaluate result is ', json.dumps(self.result, indent=1))
-        with open(os.path.join(save_path, '{}.json'.format(filename)), 'w') \
-                as f:
+            filename = time.strftime("%Y_%m_%d_%H_%M_%S", time.localtime(time.time()))
+        print("evaluate result is ", json.dumps(self.result, indent=1))
+        with open(os.path.join(save_path, "{}.json".format(filename)), "w") as f:
             json.dump(self.result, f)
 
     def clear(self):

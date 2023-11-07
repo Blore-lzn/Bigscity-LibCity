@@ -1,5 +1,4 @@
 class AbstractDataset(object):
-
     def __init__(self, config):
         raise NotImplementedError("Dataset not implemented")
 

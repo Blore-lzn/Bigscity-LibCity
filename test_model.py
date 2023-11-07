@@ -9,17 +9,21 @@ Take the data of a batch for preliminary testing
 """
 
 # 加载配置文件
-config = ConfigParser(task='traffic_state_pred', model='RNN',
-                      dataset='METR_LA', other_args={'batch_size': 2})
-exp_id = config.get('exp_id', None)
+config = ConfigParser(
+    task="traffic_state_pred",
+    model="RNN",
+    dataset="METR_LA",
+    other_args={"batch_size": 2},
+)
+exp_id = config.get("exp_id", None)
 if exp_id is None:
     exp_id = int(random.SystemRandom().random() * 100000)
-    config['exp_id'] = exp_id
+    config["exp_id"] = exp_id
 # logger
 logger = get_logger(config)
 logger.info(config.config)
 # seed
-seed = config.get('seed', 0)
+seed = config.get("seed", 0)
 set_random_seed(seed)
 # 加载数据模块
 dataset = get_dataset(config)
@@ -30,11 +34,11 @@ data_feature = dataset.get_data_feature()
 batch = train_data.__iter__().__next__()
 # 加载模型
 model = get_model(config, data_feature)
-model = model.to(config['device'])
+model = model.to(config["device"])
 # 加载执行器
 executor = get_executor(config, model, data_feature)
 # 模型预测
-batch.to_tensor(config['device'])
+batch.to_tensor(config["device"])
 res = model.predict(batch)
-logger.info('Result shape is {}'.format(res.shape))
-logger.info('Success test the model!')
+logger.info("Result shape is {}".format(res.shape))
+logger.info("Success test the model!")

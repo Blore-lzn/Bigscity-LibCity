@@ -1,5 +1,4 @@
 class AbstractExecutor(object):
-
     def __init__(self, config, model, data_feature):
         raise NotImplementedError("Executor not implemented")
 

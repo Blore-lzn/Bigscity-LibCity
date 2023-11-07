@@ -20,27 +20,33 @@ from sklearn.neighbors import BallTree
 class GeoSANDataset(AbstractDataset):
     def __init__(self, config):
         self.LOD = 17
-        dataset_name = config['dataset']
+        dataset_name = config["dataset"]
         self.config = config
         raw_dir = "./raw_data"
         dyna = os.path.join(raw_dir, dataset_name, f"{dataset_name}.dyna")
         geo = os.path.join(raw_dir, dataset_name, f"{dataset_name}.geo")
         self.dyna = pd.read_csv(dyna)
-        self.geo = pd.read_csv(geo, index_col='geo_id')
-        self.loc2gps = {'<pad>': (0.0, 0.0)}
+        self.geo = pd.read_csv(geo, index_col="geo_id")
+        self.loc2gps = {"<pad>": (0.0, 0.0)}
         self.loc2count = {}
 
         self.n_loc = 1
-        self.loc2idx = {'<pad>': 0}
-        self.idx2loc = {0: '<pad>'}
+        self.loc2idx = {"<pad>": 0}
+        self.idx2loc = {0: "<pad>"}
         self.idx2gps = {0: (0.0, 0.0)}  # (latitude, longitude) tuple
         self.build_vocab()
-        print(f'{self.n_loc} locations')
-        self.user_seq, self.user2idx, \
-            self.region2idx, self.n_user, \
-            self.n_region, self.region2loc, self.n_time = self.processing()
-        print(f'{len(self.user_seq)} users')
-        print(f'{len(self.region2idx)} regions')
+        print(f"{self.n_loc} locations")
+        (
+            self.user_seq,
+            self.user2idx,
+            self.region2idx,
+            self.n_user,
+            self.n_region,
+            self.region2loc,
+            self.n_time,
+        ) = self.processing()
+        print(f"{len(self.user_seq)} users")
+        print(f"{len(self.region2idx)} regions")
 
     def get_data(self):
         """
@@ -52,14 +58,18 @@ class GeoSANDataset(AbstractDataset):
                 eval_dataloader: None(no valid step) \n
                 test_dataloader: Dataloader composed of Batch (class)
         """
-        assert self.config['executor_config']["train"]["negative_sampler"] == "KNNSampler"
-        assert self.config['executor_config']["test"]["negative_sampler"] == "KNNSampler"
+        assert (
+            self.config["executor_config"]["train"]["negative_sampler"] == "KNNSampler"
+        )
+        assert (
+            self.config["executor_config"]["test"]["negative_sampler"] == "KNNSampler"
+        )
         user_visited_locs = self.get_visited_locs()
 
         train_dataset, test_dataset = self.split()
-        batch_size = int(self.config['executor_config']['train']['batch_size'])
-        num_workers = int(self.config['executor_config']['train']['num_workers'])
-        num_neg = int(self.config['executor_config']['train']['num_negative_samples'])
+        batch_size = int(self.config["executor_config"]["train"]["batch_size"])
+        num_workers = int(self.config["executor_config"]["train"]["num_workers"])
+        num_neg = int(self.config["executor_config"]["train"]["num_negative_samples"])
         print(f"num_neg: {num_neg}")
         print("build LocQuerySystem...")
         loc_query_sys = LocQuerySystem()
@@ -69,26 +79,39 @@ class GeoSANDataset(AbstractDataset):
         sampler = KNNSampler(
             query_sys=loc_query_sys,
             user_visited_locs=user_visited_locs,
-            **self.config['executor_config']["train"]["negative_sampler_config"]
+            **self.config["executor_config"]["train"]["negative_sampler_config"],
         )
-        train_loader = DataLoader(train_dataset, sampler=LadderSampler(train_dataset, batch_size),
-                                  num_workers=num_workers, batch_size=batch_size,
-                                  collate_fn=lambda e: GeoSANDataset.collect_fn_quadkey(e, train_dataset,
-                                                                                        sampler, self.QUADKEY,
-                                                                                        self.loc2quadkey, k=num_neg))
+        train_loader = DataLoader(
+            train_dataset,
+            sampler=LadderSampler(train_dataset, batch_size),
+            num_workers=num_workers,
+            batch_size=batch_size,
+            collate_fn=lambda e: GeoSANDataset.collect_fn_quadkey(
+                e, train_dataset, sampler, self.QUADKEY, self.loc2quadkey, k=num_neg
+            ),
+        )
 
         test_sampler = KNNSampler(
             query_sys=loc_query_sys,
             user_visited_locs=user_visited_locs,
-            **self.config['executor_config']["test"]["negative_sampler_config"]
+            **self.config["executor_config"]["test"]["negative_sampler_config"],
         )
         print("get test_loader...")
-        num_neg_test = int(self.config['executor_config']['test']['num_negative_samples'])
-        test_loader = DataLoader(test_dataset, batch_size=batch_size,
-                                 collate_fn=lambda e:
-                                 GeoSANDataset.collect_fn_quadkey(e, test_dataset,
-                                                                  test_sampler, self.QUADKEY,
-                                                                  self.loc2quadkey, k=num_neg_test))
+        num_neg_test = int(
+            self.config["executor_config"]["test"]["num_negative_samples"]
+        )
+        test_loader = DataLoader(
+            test_dataset,
+            batch_size=batch_size,
+            collate_fn=lambda e: GeoSANDataset.collect_fn_quadkey(
+                e,
+                test_dataset,
+                test_sampler,
+                self.QUADKEY,
+                self.loc2quadkey,
+                k=num_neg_test,
+            ),
+        )
 
         return train_loader, None, test_loader
 
@@ -100,15 +123,23 @@ class GeoSANDataset(AbstractDataset):
             dict: 包含数据集的相关特征的字典
         """
         tmp = {
-            'nuser': self.n_user,
-            'nloc': self.n_loc,
-            'ntime': self.n_time,
-            'nquadkey': len(self.QUADKEY.vocab.itos)
+            "nuser": self.n_user,
+            "nloc": self.n_loc,
+            "ntime": self.n_time,
+            "nquadkey": len(self.QUADKEY.vocab.itos),
         }
         return tmp
 
     @staticmethod
-    def collect_fn_quadkey(batch, data_source, sampler, region_processer, loc2quadkey=None, k=5, with_trg_quadkey=True):
+    def collect_fn_quadkey(
+        batch,
+        data_source,
+        sampler,
+        region_processer,
+        loc2quadkey=None,
+        k=5,
+        with_trg_quadkey=True,
+    ):
         src, trg = zip(*batch)
         user, loc, time, region = [], [], [], []
         data_size = []
@@ -146,15 +177,26 @@ class GeoSANDataset(AbstractDataset):
             # (N, T, k+1, LEN_QUADKEY)
             batch_trg_regs = pad_sequence(batch_trg_regs, batch_first=True)
             # [(1+k) * T, N, LEN_QUADKEY)
-            batch_trg_regs = batch_trg_regs.permute(2, 1,
-                                                    0, 3).contiguous().view(-1,
-                                                                            batch_trg_regs.size(0),
-                                                                            batch_trg_regs.size(3))
+            batch_trg_regs = (
+                batch_trg_regs.permute(2, 1, 0, 3)
+                .contiguous()
+                .view(-1, batch_trg_regs.size(0), batch_trg_regs.size(3))
+            )
             trg_ = pad_sequence(trg_, batch_first=True)
             trg_probs_ = pad_sequence(trg_probs_, batch_first=True, padding_value=1.0)
             trg_ = trg_.permute(2, 1, 0).contiguous().view(-1, trg_.size(0))
             trg_nov_ = [[not e[-1] for e in seq] for seq in trg]
-            return user_.t(), loc_.t(), time_.t(), region_, trg_, batch_trg_regs, trg_nov_, trg_probs_, data_size
+            return (
+                user_.t(),
+                loc_.t(),
+                time_.t(),
+                region_,
+                trg_,
+                batch_trg_regs,
+                trg_nov_,
+                trg_probs_,
+                data_size,
+            )
         else:
             for i, seq in enumerate(trg):
                 pos = torch.tensor([[e[1]] for e in seq])
@@ -165,7 +207,16 @@ class GeoSANDataset(AbstractDataset):
             trg_probs_ = pad_sequence(trg_probs_, batch_first=True, padding_value=1.0)
             trg_ = trg_.permute(2, 1, 0).contiguous().view(-1, trg_.size(0))
             trg_nov_ = [[not e[-1] for e in seq] for seq in trg]
-            return user_.t(), loc_.t(), time_.t(), region_, trg_, trg_nov_, trg_probs_, data_size
+            return (
+                user_.t(),
+                loc_.t(),
+                time_.t(),
+                region_,
+                trg_,
+                trg_nov_,
+                trg_probs_,
+                data_size,
+            )
 
     def region_stats(self):
         """
@@ -175,15 +226,22 @@ class GeoSANDataset(AbstractDataset):
         for reg in self.region2loc:
             num_reg_locs.append(len(self.region2loc[reg]))
         num_reg_locs = np.array(num_reg_locs, dtype=np.int32)
-        print("min #loc/region: {:d}, with {:d} regions".format(np.min(num_reg_locs),
-                                                                np.count_nonzero(num_reg_locs == 1)))
+        print(
+            "min #loc/region: {:d}, with {:d} regions".format(
+                np.min(num_reg_locs), np.count_nonzero(num_reg_locs == 1)
+            )
+        )
         print("max #loc/region:", np.max(num_reg_locs))
         print("avg #loc/region: {:.4f}".format(np.mean(num_reg_locs)))
-        hist, bin_edges = np.histogram(num_reg_locs,
-                                       bins=[1, 3, 5, 10, 20, 50, 100, 200, np.max(num_reg_locs)])
+        hist, bin_edges = np.histogram(
+            num_reg_locs, bins=[1, 3, 5, 10, 20, 50, 100, 200, np.max(num_reg_locs)]
+        )
         for i in range(len(bin_edges) - 1):
-            print("#loc in [{}, {}]: {:d} regions".format(math.ceil(bin_edges[i]),
-                                                          math.ceil(bin_edges[i + 1] - 1), hist[i]))
+            print(
+                "#loc in [{}, {}]: {:d} regions".format(
+                    math.ceil(bin_edges[i]), math.ceil(bin_edges[i + 1] - 1), hist[i]
+                )
+            )
 
     def get_visited_locs(self):
         print("get_visited_locs...")
@@ -202,15 +260,17 @@ class GeoSANDataset(AbstractDataset):
         return user_visited_locs
 
     def build_vocab(self, min_freq=10):
-        for row in tqdm(self.dyna.itertuples(), desc="build_vocab", ncols=100, total=len(self.dyna)):
-            loc = getattr(row, 'location')
+        for row in tqdm(
+            self.dyna.itertuples(), desc="build_vocab", ncols=100, total=len(self.dyna)
+        ):
+            loc = getattr(row, "location")
             coordinate = self.__get_lat_lon__(loc)
             self.add_location(loc, coordinate)
 
         if min_freq > 0:
             self.n_loc = 1
-            self.loc2idx = {'<pad>': 0}
-            self.idx2loc = {0: '<pad>'}
+            self.loc2idx = {"<pad>": 0}
+            self.idx2loc = {0: "<pad>"}
             self.idx2gps = {0: (0.0, 0.0)}
             for loc in self.loc2count:
                 if self.loc2count[loc] >= min_freq:
@@ -229,14 +289,16 @@ class GeoSANDataset(AbstractDataset):
         regidx2loc = defaultdict(set)
         n_region = 1
 
-        for row in tqdm(self.dyna.itertuples(), desc="processing", ncols=100, total=len(self.dyna)):
-            user = getattr(row, 'entity_id')
-            loc = getattr(row, 'location')
+        for row in tqdm(
+            self.dyna.itertuples(), desc="processing", ncols=100, total=len(self.dyna)
+        ):
+            user = getattr(row, "entity_id")
+            loc = getattr(row, "location")
             lat, lon = self.__get_lat_lon__(loc)
-            time = getattr(row, 'time')
+            time = getattr(row, "time")
             if loc not in self.loc2idx:
                 continue
-            time = datetime.strptime(time, '%Y-%m-%dT%H:%M:%SZ')
+            time = datetime.strptime(time, "%Y-%m-%dT%H:%M:%SZ")
             # time = datetime.strptime(time, "%Y-%m-%d %H:%M:%S+00:00")
             time_idx = time.weekday() * 24 + time.hour + 1
             loc_idx = self.loc2idx[loc]
@@ -284,17 +346,25 @@ class GeoSANDataset(AbstractDataset):
             for i in range(len(seq)):
                 check_in = seq[i]
                 region_quadkey = check_in[3]
-                region_quadkey_bigram = ' '.join([''.join(x) for x in ngrams(region_quadkey, 6)])
+                region_quadkey_bigram = " ".join(
+                    ["".join(x) for x in ngrams(region_quadkey, 6)]
+                )
                 region_quadkey_bigram = region_quadkey_bigram.split()
                 all_quadkeys.append(region_quadkey_bigram)
-                user_seq_array[u][i] = (check_in[0], check_in[1], check_in[2], region_quadkey_bigram, check_in[4])
+                user_seq_array[u][i] = (
+                    check_in[0],
+                    check_in[1],
+                    check_in[2],
+                    region_quadkey_bigram,
+                    check_in[4],
+                )
 
         # 再把所有的loc对应的quadkey添加到loc2quadkey与all_quadkeys中
-        self.loc2quadkey = ['NULL']
+        self.loc2quadkey = ["NULL"]
         for loc_idx in range(1, self.n_loc):
             lat, lon = self.idx2gps[loc_idx]
             quadkey = latlon2quadkey(float(lat), float(lon), self.LOD)
-            quadkey_bigram = ' '.join([''.join(x) for x in ngrams(quadkey, 6)])
+            quadkey_bigram = " ".join(["".join(x) for x in ngrams(quadkey, 6)])
             quadkey_bigram = quadkey_bigram.split()
             self.loc2quadkey.append(quadkey_bigram)
             all_quadkeys.append(quadkey_bigram)
@@ -304,14 +374,14 @@ class GeoSANDataset(AbstractDataset):
             use_vocab=True,
             batch_first=True,
             unk_token=None,
-            preprocessing=str.split
+            preprocessing=str.split,
         )
         self.QUADKEY.build_vocab(all_quadkeys)
 
         return user_seq_array, user2idx, region2idx, n_users, n_region, regidx2loc, 169
 
     def __get_lat_lon__(self, loc):
-        coor = eval(self.geo.loc[loc]['coordinates'])
+        coor = eval(self.geo.loc[loc]["coordinates"])
         return coor[0], coor[1]
 
     def add_location(self, loc, coordinate):
@@ -349,21 +419,22 @@ class GeoSANDataset(AbstractDataset):
                 if not seq[i][4]:
                     break
             for b in range(math.floor((i + max_len - 1) // max_len)):
-                if (i - b * max_len) > max_len*1.1:
-                    trg = seq[(i - (b + 1) * max_len): (i - b * max_len)]
-                    src = seq[(i - (b + 1) * max_len - 1): (i - b * max_len - 1)]
+                if (i - b * max_len) > max_len * 1.1:
+                    trg = seq[(i - (b + 1) * max_len) : (i - b * max_len)]
+                    src = seq[(i - (b + 1) * max_len - 1) : (i - b * max_len - 1)]
                     train_seq.append((src, trg))
                 else:
-                    trg = seq[1: (i - b * max_len)]
-                    src = seq[0: (i - b * max_len - 1)]
+                    trg = seq[1 : (i - b * max_len)]
+                    src = seq[0 : (i - b * max_len - 1)]
                     train_seq.append((src, trg))
                     break
             # test_seq的src的长度为min(i,max_len), 为到i之前的元素；
             # trg的长度为1, 即索引i对应的元素
-            test_seq.append((seq[max(0, -max_len+i):i], seq[i:i+1]))
+            test_seq.append((seq[max(0, -max_len + i) : i], seq[i : i + 1]))
         train_.user_seq = train_seq
         test_.user_seq = sorted(test_seq, key=lambda e: len(e[0]))
         return train_, test_
+
 
 # utils for dataset
 
@@ -385,16 +456,14 @@ class LocQuerySystem:
         for idx, (lat, lon) in dataset.idx2gps.items():
             if idx != 0:
                 self.coordinates[idx - 1] = [lat, lon]
-        self.tree = BallTree(
-            self.coordinates,
-            leaf_size=1,
-            metric='haversine'
-        )
+        self.tree = BallTree(self.coordinates, leaf_size=1, metric="haversine")
 
     def prefetch_knn(self, k=100):
         self.knn = k
         self.knn_results = np.zeros((self.coordinates.shape[0], k), dtype=np.int32)
-        for idx, gps in tqdm(enumerate(self.coordinates), total=len(self.coordinates), leave=True):
+        for idx, gps in tqdm(
+            enumerate(self.coordinates), total=len(self.coordinates), leave=True
+        ):
             trg_gps = gps.reshape(1, -1)
             _, knn_locs = self.tree.query(trg_gps, k + 1)
             knn_locs = knn_locs[0, 1:]
@@ -404,8 +473,10 @@ class LocQuerySystem:
     def prefetch_radius(self, radius=10.0):
         self.radius = radius
         self.radius_results = {}
-        radius /= 6371000/1000
-        for idx, gps in tqdm(enumerate(self.coordinates), total=len(self.coordinates), leave=True):
+        radius /= 6371000 / 1000
+        for idx, gps in tqdm(
+            enumerate(self.coordinates), total=len(self.coordinates), leave=True
+        ):
             trg_gps = gps.reshape(1, -1)
             nearby_locs = self.tree.query_radius(trg_gps, r=radius)
             nearby_locs = nearby_locs[0]
@@ -425,7 +496,7 @@ class LocQuerySystem:
     def get_radius(self, trg_loc, r=10.0):
         if r == self.radius:
             return self.radius_results[trg_loc]
-        r /= 6371000/1000
+        r /= 6371000 / 1000
         trg_gps = self.coordinates[trg_loc - 1].reshape(1, -1)
         nearby_locs = self.tree.query_radius(trg_gps, r=r)
         nearby_locs = nearby_locs[0]
@@ -434,7 +505,7 @@ class LocQuerySystem:
         return nearby_locs
 
     def radius_stats(self, radius=10):
-        radius /= 6371000/1000
+        radius /= 6371000 / 1000
         num_nearby_locs = []
         for gps in tqdm(self.coordinates, total=len(self.coordinates), leave=True):
             trg_gps = gps.reshape(1, -1)
@@ -442,11 +513,17 @@ class LocQuerySystem:
             num_nearby_locs.append(count)
         num_nearby_locs = np.array(num_nearby_locs, dtype=np.int32)
         max_loc_idx = np.argsort(-num_nearby_locs)[0]
-        print("max #nearby_locs: {:d}, at loc {:d}".format(num_nearby_locs[max_loc_idx], max_loc_idx + 1))
+        print(
+            "max #nearby_locs: {:d}, at loc {:d}".format(
+                num_nearby_locs[max_loc_idx], max_loc_idx + 1
+            )
+        )
 
 
 class KNNSampler(nn.Module):
-    def __init__(self, query_sys, user_visited_locs, num_nearest=100, exclude_visited=False):
+    def __init__(
+        self, query_sys, user_visited_locs, num_nearest=100, exclude_visited=False
+    ):
         nn.Module.__init__(self)
         self.query_sys = query_sys
         self.num_nearest = num_nearest
@@ -455,7 +532,7 @@ class KNNSampler(nn.Module):
 
     def forward(self, trg_seq, k, user, **kwargs):
         """
-            基于query_sys从候选集中随机采样k个作为负样例
+        基于query_sys从候选集中随机采样k个作为负样例
         """
         neg_samples = []
         for check_in in trg_seq:
@@ -516,7 +593,7 @@ def txy2quadkey(tile_x, tile_y, level_of_detail):
             digit += 2
         quadkey.append(str(digit))
 
-    return ''.join(quadkey)
+    return "".join(quadkey)
 
 
 def pxy2txy(pixel_x, pixel_y):
@@ -545,7 +622,11 @@ class LadderSampler(Sampler):
         if self.fix_order:
             d = zip(self.data, np.arange(len(self.data)), np.arange(len(self.data)))
         else:
-            d = zip(self.data, np.random.permutation(len(self.data)), np.arange(len(self.data)))
+            d = zip(
+                self.data,
+                np.random.permutation(len(self.data)),
+                np.arange(len(self.data)),
+            )
         d = sorted(d, key=lambda e: (e[1] // self.batch_size, e[0]), reverse=True)
         return iter(e[2] for e in d)
 

@@ -15,22 +15,22 @@ class FPMC(AbstractModel):
 
     def __init__(self, config, data_feature):
         super(FPMC, self).__init__(config, data_feature)
-        self.embedding_size = config['embedding_size']
-        self.device = config['device']
-        self.uid_size = data_feature['uid_size']
-        self.loc_size = data_feature['loc_size']
+        self.embedding_size = config["embedding_size"]
+        self.device = config["device"]
+        self.uid_size = data_feature["uid_size"]
+        self.loc_size = data_feature["loc_size"]
 
         # 可以把 FPMC 的那四个矩阵看成 Embedding
         self.UI_emb = nn.Embedding(self.uid_size, self.embedding_size)
         self.IU_emb = nn.Embedding(
-            self.loc_size, self.embedding_size,
-            padding_idx=data_feature['loc_pad'])
+            self.loc_size, self.embedding_size, padding_idx=data_feature["loc_pad"]
+        )
         self.LI_emb = nn.Embedding(
-            self.loc_size, self.embedding_size,
-            padding_idx=data_feature['loc_pad'])
+            self.loc_size, self.embedding_size, padding_idx=data_feature["loc_pad"]
+        )
         self.IL_emb = nn.Embedding(
-            self.loc_size, self.embedding_size,
-            padding_idx=data_feature['loc_pad'])
+            self.loc_size, self.embedding_size, padding_idx=data_feature["loc_pad"]
+        )
 
         self.apply(self._init_weights)
 
@@ -41,14 +41,16 @@ class FPMC(AbstractModel):
     def forward(self, batch):
         # Embedding 复现思路
 
-        last_loc_index = torch.LongTensor(batch.get_origin_len(
-            'current_loc')) - 1  # Markov chain 仅根据最后一个位置来预测，所以要拿出最后一个位置
+        last_loc_index = (
+            torch.LongTensor(batch.get_origin_len("current_loc")) - 1
+        )  # Markov chain 仅根据最后一个位置来预测，所以要拿出最后一个位置
         last_loc_index = last_loc_index.to(self.device)
         # batch_size * 1
         last_loc = torch.gather(
-            batch['current_loc'], dim=1, index=last_loc_index.unsqueeze(1))
+            batch["current_loc"], dim=1, index=last_loc_index.unsqueeze(1)
+        )
 
-        user_emb = self.UI_emb(batch['uid'])  # batch_size * embedding_size
+        user_emb = self.UI_emb(batch["uid"])  # batch_size * embedding_size
         last_loc_emb = self.LI_emb(last_loc)  # batch_size * 1 * embedding_size
 
         all_iu_emb = self.IU_emb.weight  # loc_size * embedding_size
@@ -67,4 +69,4 @@ class FPMC(AbstractModel):
         # 这个 loss 不太对，之后再改
         criterion = nn.NLLLoss().to(self.device)
         scores = self.forward(batch)
-        return criterion(scores, batch['target'])
+        return criterion(scores, batch["target"])

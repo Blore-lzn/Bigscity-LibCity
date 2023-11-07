@@ -15,7 +15,7 @@ def unnormalize(data, mean, std):
     return data * std + mean
 
 
-def get_local_seq(full_seq, kernel_size, mean, std, device=torch.device('cpu')):
+def get_local_seq(full_seq, kernel_size, mean, std, device=torch.device("cpu")):
     seq_len = full_seq.size()[1]
 
     indices = torch.LongTensor(seq_len).to(device)
@@ -24,8 +24,8 @@ def get_local_seq(full_seq, kernel_size, mean, std, device=torch.device('cpu')):
 
     indices = Variable(indices, requires_grad=False)
 
-    first_seq = torch.index_select(full_seq, dim=1, index=indices[kernel_size - 1:])
-    second_seq = torch.index_select(full_seq, dim=1, index=indices[:-kernel_size + 1])
+    first_seq = torch.index_select(full_seq, dim=1, index=indices[kernel_size - 1 :])
+    second_seq = torch.index_select(full_seq, dim=1, index=indices[: -kernel_size + 1])
 
     local_seq = first_seq - second_seq
 
@@ -42,7 +42,7 @@ class Attr(nn.Module):
         self.data_feature = data_feature
 
         for name, dim_in, dim_out in self.embed_dims:
-            self.add_module(name + '_em', nn.Embedding(dim_in, dim_out))
+            self.add_module(name + "_em", nn.Embedding(dim_in, dim_out))
 
     def out_size(self):
         sz = 0
@@ -54,14 +54,17 @@ class Attr(nn.Module):
     def forward(self, batch):
         em_list = []
         for name, _, _ in self.embed_dims:
-            embed = getattr(self, name + '_em')
+            embed = getattr(self, name + "_em")
             attr_t = batch[name]
 
             attr_t = torch.squeeze(embed(attr_t))
 
             em_list.append(attr_t)
 
-        dist_mean, dist_std = self.data_feature["dist_mean"], self.data_feature["dist_std"]
+        dist_mean, dist_std = (
+            self.data_feature["dist_mean"],
+            self.data_feature["dist_std"],
+        )
         dist = normalize(batch["dist"], dist_mean, dist_std)
         dist = normalize(dist, dist_mean, dist_std)
         em_list.append(dist)
@@ -70,7 +73,9 @@ class Attr(nn.Module):
 
 
 class GeoConv(nn.Module):
-    def __init__(self, kernel_size, num_filter, data_feature={}, device=torch.device('cpu')):
+    def __init__(
+        self, kernel_size, num_filter, data_feature={}, device=torch.device("cpu")
+    ):
         super(GeoConv, self).__init__()
 
         self.kernel_size = kernel_size
@@ -83,14 +88,20 @@ class GeoConv(nn.Module):
         self.conv = nn.Conv1d(16, self.num_filter, self.kernel_size)
 
     def forward(self, batch):
-        longi_mean, longi_std = self.data_feature["longi_mean"], self.data_feature["longi_std"]
+        longi_mean, longi_std = (
+            self.data_feature["longi_mean"],
+            self.data_feature["longi_std"],
+        )
         current_longi = normalize(batch["current_longi"], longi_mean, longi_std)
         lngs = torch.unsqueeze(current_longi, dim=2)
-        lati_mean, lati_std = self.data_feature["lati_mean"], self.data_feature["lati_std"]
+        lati_mean, lati_std = (
+            self.data_feature["lati_mean"],
+            self.data_feature["lati_std"],
+        )
         current_lati = normalize(batch["current_lati"], lati_mean, lati_std)
         lats = torch.unsqueeze(current_lati, dim=2)
 
-        states = self.state_em(batch['current_state'].long())
+        states = self.state_em(batch["current_state"].long())
 
         locs = torch.cat((lngs, lats, states), dim=2)
 
@@ -100,11 +111,16 @@ class GeoConv(nn.Module):
 
         conv_locs = F.elu(self.conv(locs)).permute(0, 2, 1)
 
-        dist_gap_mean, dist_gap_std = self.data_feature["dist_gap_mean"], self.data_feature["dist_gap_std"]
+        dist_gap_mean, dist_gap_std = (
+            self.data_feature["dist_gap_mean"],
+            self.data_feature["dist_gap_std"],
+        )
         current_dis = normalize(batch["current_dis"], dist_gap_mean, dist_gap_std)
 
         # calculate the dist for local paths
-        local_dist = get_local_seq(current_dis, self.kernel_size, dist_gap_mean, dist_gap_std, self.device)
+        local_dist = get_local_seq(
+            current_dis, self.kernel_size, dist_gap_mean, dist_gap_std, self.device
+        )
         local_dist = torch.unsqueeze(local_dist, dim=2)
 
         conv_locs = torch.cat((conv_locs, local_dist), dim=2)
@@ -113,13 +129,23 @@ class GeoConv(nn.Module):
 
 
 class SpatioTemporal(nn.Module):
-    '''
+    """
     attr_size: the dimension of attr_net output
     pooling optitions: last, mean, attention
-    '''
-    def __init__(self, attr_size, kernel_size=3, num_filter=32, pooling_method='attention',
-                 rnn_type='LSTM',  rnn_num_layers=1, hidden_size=128,
-                 data_feature={}, device=torch.device('cpu')):
+    """
+
+    def __init__(
+        self,
+        attr_size,
+        kernel_size=3,
+        num_filter=32,
+        pooling_method="attention",
+        rnn_type="LSTM",
+        rnn_num_layers=1,
+        hidden_size=128,
+        data_feature={},
+        device=torch.device("cpu"),
+    ):
         super(SpatioTemporal, self).__init__()
 
         self.kernel_size = kernel_size
@@ -137,23 +163,23 @@ class SpatioTemporal(nn.Module):
             device=device,
         )
         # num_filter: output size of each GeoConv + 1:distance of local path + attr_size: output size of attr component
-        if rnn_type.upper() == 'LSTM':
+        if rnn_type.upper() == "LSTM":
             self.rnn = nn.LSTM(
                 input_size=num_filter + 1 + attr_size,
                 hidden_size=hidden_size,
                 num_layers=rnn_num_layers,
                 batch_first=True,
             )
-        elif rnn_type.upper() == 'RNN':
+        elif rnn_type.upper() == "RNN":
             self.rnn = nn.RNN(
                 input_size=num_filter + 1 + attr_size,
                 hidden_size=hidden_size,
                 num_layers=rnn_num_layers,
-                batch_first=True
+                batch_first=True,
             )
         else:
-            raise ValueError('invalid rnn_type, please select `RNN` or `LSTM`')
-        if pooling_method == 'attention':
+            raise ValueError("invalid rnn_type, please select `RNN` or `LSTM`")
+        if pooling_method == "attention":
             self.attr2atten = nn.Linear(attr_size, hidden_size)
 
     def out_size(self):
@@ -192,7 +218,7 @@ class SpatioTemporal(nn.Module):
         conv_locs = self.geo_conv(batch)
 
         attr_t = torch.unsqueeze(attr_t, dim=1)
-        expand_attr_t = attr_t.expand(conv_locs.size()[:2] + (attr_t.size()[-1], ))
+        expand_attr_t = attr_t.expand(conv_locs.size()[:2] + (attr_t.size()[-1],))
 
         # concat the loc_conv and the attributes
         conv_locs = torch.cat((conv_locs, expand_attr_t), dim=2)
@@ -200,12 +226,16 @@ class SpatioTemporal(nn.Module):
         lens = [batch["current_longi"].shape[1]] * batch["current_longi"].shape[0]
         lens = list(map(lambda x: x - self.kernel_size + 1, lens))
 
-        packed_inputs = nn.utils.rnn.pack_padded_sequence(conv_locs, lens, batch_first=True)
+        packed_inputs = nn.utils.rnn.pack_padded_sequence(
+            conv_locs, lens, batch_first=True
+        )
 
         packed_hiddens, _ = self.rnn(packed_inputs)
-        hiddens, lens = nn.utils.rnn.pad_packed_sequence(packed_hiddens, batch_first=True)
+        hiddens, lens = nn.utils.rnn.pad_packed_sequence(
+            packed_hiddens, batch_first=True
+        )
 
-        if self.pooling_method == 'mean':
+        if self.pooling_method == "mean":
             return packed_hiddens, lens, self.mean_pooling(hiddens, lens)
         else:
             # self.pooling_method == 'attention'
@@ -280,33 +310,33 @@ class DeepTTE(AbstractTrafficStateModel):
         super(DeepTTE, self).__init__(config, data_feature)
         self.config = config
         self.data_feature = data_feature
-        self.device = config.get('device', torch.device('cpu'))
+        self.device = config.get("device", torch.device("cpu"))
 
         uid_emb_size = config.get("uid_emb_size", 16)
         weekid_emb_size = config.get("weekid_emb_size", 3)
         timdid_emb_size = config.get("timdid_emb_size", 8)
         uid_size = data_feature.get("uid_size", 24000)
         embed_dims = [
-            ('uid', uid_size, uid_emb_size),
-            ('weekid', 7, weekid_emb_size),
-            ('timeid', 1440, timdid_emb_size),
+            ("uid", uid_size, uid_emb_size),
+            ("weekid", 7, weekid_emb_size),
+            ("timeid", 1440, timdid_emb_size),
         ]
 
         # parameter of attribute / spatio-temporal component
-        self.kernel_size = config.get('kernel_size', 3)
-        num_filter = config.get('num_filter', 32)
+        self.kernel_size = config.get("kernel_size", 3)
+        num_filter = config.get("num_filter", 32)
         pooling_method = config.get("pooling_method", "attention")
 
         # parameter of multi-task learning component
-        num_final_fcs = config.get('num_final_fcs', 3)
-        final_fc_size = config.get('final_fc_size', 128)
-        self.alpha = config.get('alpha', 0.3)
+        num_final_fcs = config.get("num_final_fcs", 3)
+        final_fc_size = config.get("final_fc_size", 128)
+        self.alpha = config.get("alpha", 0.3)
 
-        rnn_type = config.get('rnn_type', 'LSTM')
-        rnn_num_layers = config.get('rnn_num_layers', 1)
-        hidden_size = config.get('hidden_size', 128)
+        rnn_type = config.get("rnn_type", "LSTM")
+        rnn_num_layers = config.get("rnn_num_layers", 1)
+        hidden_size = config.get("hidden_size", 128)
 
-        self.eps = config.get('eps', 10)
+        self.eps = config.get("eps", 10)
 
         # attribute component
         self.attr_net = Attr(embed_dims, data_feature)
@@ -339,9 +369,9 @@ class DeepTTE(AbstractTrafficStateModel):
 
     def _init_weight(self):
         for name, param in self.named_parameters():
-            if name.find('.bias') != -1:
+            if name.find(".bias") != -1:
                 param.data.fill_(0)
-            elif name.find('.weight') != -1:
+            elif name.find(".weight") != -1:
                 nn.init.xavier_uniform_(param.data)
 
     def forward(self, batch):
@@ -366,27 +396,44 @@ class DeepTTE(AbstractTrafficStateModel):
         else:
             entire_out = self.predict(batch)
 
-        time_mean, time_std = self.data_feature["time_mean"], self.data_feature["time_std"]
+        time_mean, time_std = (
+            self.data_feature["time_mean"],
+            self.data_feature["time_std"],
+        )
         entire_out = normalize(entire_out, time_mean, time_std)
         time = normalize(batch["time"], time_mean, time_std)
-        entire_loss = self.entire_estimate.eval_on_batch(entire_out, time, time_mean, time_std)
+        entire_loss = self.entire_estimate.eval_on_batch(
+            entire_out, time, time_mean, time_std
+        )
 
         if self.training:
             # get the mean/std of each local path
-            time_gap_mean, time_gap_std = self.data_feature["time_gap_mean"], self.data_feature["time_gap_std"]
-            mean, std = (self.kernel_size - 1) * time_gap_mean, (self.kernel_size - 1) * time_gap_std
+            time_gap_mean, time_gap_std = (
+                self.data_feature["time_gap_mean"],
+                self.data_feature["time_gap_std"],
+            )
+            mean, std = (self.kernel_size - 1) * time_gap_mean, (
+                self.kernel_size - 1
+            ) * time_gap_std
             current_tim = normalize(batch["current_tim"], time_gap_mean, time_gap_std)
 
             # get ground truth of each local path
-            local_label = get_local_seq(current_tim, self.kernel_size, mean, std, self.device)
-            local_loss = self.local_estimate.eval_on_batch(local_out, local_length, local_label, mean, std)
+            local_label = get_local_seq(
+                current_tim, self.kernel_size, mean, std, self.device
+            )
+            local_loss = self.local_estimate.eval_on_batch(
+                local_out, local_length, local_label, mean, std
+            )
 
             return (1 - self.alpha) * entire_loss + self.alpha * local_loss
         else:
             return entire_loss
 
     def predict(self, batch):
-        time_mean, time_std = self.data_feature["time_mean"], self.data_feature["time_std"]
+        time_mean, time_std = (
+            self.data_feature["time_mean"],
+            self.data_feature["time_std"],
+        )
         if self.training:
             entire_out, (local_out, local_length) = self.forward(batch)
             entire_out = unnormalize(entire_out, time_mean, time_std)

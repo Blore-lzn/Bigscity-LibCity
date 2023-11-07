@@ -105,10 +105,10 @@ class MinMax11Scaler(Scaler):
         self.max = maxx
 
     def transform(self, data):
-        return ((data - self.min) / (self.max - self.min)) * 2. - 1.
+        return ((data - self.min) / (self.max - self.min)) * 2.0 - 1.0
 
     def inverse_transform(self, data):
-        return ((data + 1.) / 2.) * (self.max - self.min) + self.min
+        return ((data + 1.0) / 2.0) * (self.max - self.min) + self.min
 
 
 class LogScaler(Scaler):

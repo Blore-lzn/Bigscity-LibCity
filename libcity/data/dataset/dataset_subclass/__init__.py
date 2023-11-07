@@ -7,12 +7,16 @@ from libcity.data.dataset.dataset_subclass.gman_dataset import GMANDataset
 from libcity.data.dataset.dataset_subclass.gts_dataset import GTSDataset
 from libcity.data.dataset.dataset_subclass.staggcn_dataset import STAGGCNDataset
 from libcity.data.dataset.dataset_subclass.dmvstnet_dataset import DMVSTNetDataset
-from libcity.data.dataset.dataset_subclass.pbs_trajectory_dataset import PBSTrajectoryDataset
+from libcity.data.dataset.dataset_subclass.pbs_trajectory_dataset import (
+    PBSTrajectoryDataset,
+)
 from libcity.data.dataset.dataset_subclass.stdn_dataset import STDNDataset
 from libcity.data.dataset.dataset_subclass.hgcn_dataset import HGCNDataset
 from libcity.data.dataset.dataset_subclass.convgcn_dataset import CONVGCNDataset
 from libcity.data.dataset.dataset_subclass.reslstm_dataset import RESLSTMDataset
-from libcity.data.dataset.dataset_subclass.multi_stgcnet_dataset import MultiSTGCnetDataset
+from libcity.data.dataset.dataset_subclass.multi_stgcnet_dataset import (
+    MultiSTGCnetDataset,
+)
 from libcity.data.dataset.dataset_subclass.crann_dataset import CRANNDataset
 from libcity.data.dataset.dataset_subclass.ccrnn_dataset import CCRNNDataset
 from libcity.data.dataset.dataset_subclass.chebconv_dataset import ChebConvDataset
@@ -33,13 +37,13 @@ __all__ = [
     "STDNDataset",
     "HGCNDataset",
     "STAGGCNDataset",
-    'CONVGCNDataset',
+    "CONVGCNDataset",
     "RESLSTMDataset",
     "MultiSTGCnetDataset",
     "CRANNDataset",
     "CCRNNDataset",
     "DMVSTNetDataset",
-    'ChebConvDataset',
+    "ChebConvDataset",
     "CSTNDataset",
     "GeoSANDataset",
     "GSNetDataset",

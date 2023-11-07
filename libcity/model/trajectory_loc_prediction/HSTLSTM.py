@@ -46,8 +46,8 @@ class STLSTMCell(nn.Module):
             self.b_ih = Parameter(torch.Tensor(4 * hidden_size))
             self.b_hh = Parameter(torch.Tensor(4 * hidden_size))
         else:
-            self.register_parameter('b_ih', None)
-            self.register_parameter('b_hh', None)
+            self.register_parameter("b_ih", None)
+            self.register_parameter("b_hh", None)
 
         self.reset_parameters()
 
@@ -55,26 +55,34 @@ class STLSTMCell(nn.Module):
         if input.size(1) != self.input_size:
             raise RuntimeError(
                 "input has inconsistent input_size: got {}, expected {}".format(
-                    input.size(1), self.input_size))
+                    input.size(1), self.input_size
+                )
+            )
 
-    def check_forward_hidden(self, input, hx, hidden_label=''):
+    def check_forward_hidden(self, input, hx, hidden_label=""):
         # type: (Tensor, Tensor, str) -> None
         if input.size(0) != hx.size(0):
             raise RuntimeError(
                 "Input batch size {} doesn't match hidden{} batch size {}".format(
-                    input.size(0), hidden_label, hx.size(0)))
+                    input.size(0), hidden_label, hx.size(0)
+                )
+            )
 
         if hx.size(1) != self.hidden_size:
             raise RuntimeError(
                 "hidden{} has inconsistent hidden_size: got {}, expected {}".format(
-                    hidden_label, hx.size(1), self.hidden_size))
+                    hidden_label, hx.size(1), self.hidden_size
+                )
+            )
 
     def reset_parameters(self):
         stdv = 1.0 / math.sqrt(self.hidden_size)
         for weight in self.parameters():
             init.uniform_(weight, -stdv, stdv)
 
-    def st_lstm_cell_cal(self, input_l, input_s, input_q, hidden, cell, w_ih, w_hh, w_s, w_q, b_ih, b_hh):
+    def st_lstm_cell_cal(
+        self, input_l, input_s, input_q, hidden, cell, w_ih, w_hh, w_s, w_q, b_ih, b_hh
+    ):
         """
         Proceed calculation of one step of STLSTM.
         :param input_l: input of location embedding, shape (batch_size, input_size)
@@ -94,7 +102,9 @@ class STLSTMCell(nn.Module):
         gates = torch.mm(input_l, w_ih.t()) + torch.mm(hidden, w_hh.t()) + b_ih + b_hh
         in_gate, forget_gate, cell_gate, out_gate = gates.chunk(4, 1)
 
-        ifo_gates = torch.cat((in_gate, forget_gate, out_gate), 1)  # shape (batch_size, 3 * hidden_size)
+        ifo_gates = torch.cat(
+            (in_gate, forget_gate, out_gate), 1
+        )  # shape (batch_size, 3 * hidden_size)
         ifo_gates += torch.mm(input_s, w_s.t()) + torch.mm(input_q, w_q.t())
         in_gate, forget_gate, out_gate = ifo_gates.chunk(3, 1)
 
@@ -121,18 +131,32 @@ class STLSTMCell(nn.Module):
         self.check_forward_input(input_s)
         self.check_forward_input(input_q)
         if hc is None:
-            zeros = torch.zeros(input_l.size(0), self.hidden_size, dtype=input_l.dtype, device=input_l.device)
+            zeros = torch.zeros(
+                input_l.size(0),
+                self.hidden_size,
+                dtype=input_l.dtype,
+                device=input_l.device,
+            )
             hc = (zeros, zeros)
-        self.check_forward_hidden(input_l, hc[0], '[0]')
-        self.check_forward_hidden(input_l, hc[1], '[0]')
-        self.check_forward_hidden(input_s, hc[0], '[0]')
-        self.check_forward_hidden(input_s, hc[1], '[0]')
-        self.check_forward_hidden(input_q, hc[0], '[0]')
-        self.check_forward_hidden(input_q, hc[1], '[0]')
-        return self.st_lstm_cell_cal(input_l=input_l, input_s=input_s, input_q=input_q,
-                                     hidden=hc[0], cell=hc[1],
-                                     w_ih=self.w_ih, w_hh=self.w_hh, w_s=self.w_s, w_q=self.w_q,
-                                     b_ih=self.b_ih, b_hh=self.b_hh)
+        self.check_forward_hidden(input_l, hc[0], "[0]")
+        self.check_forward_hidden(input_l, hc[1], "[0]")
+        self.check_forward_hidden(input_s, hc[0], "[0]")
+        self.check_forward_hidden(input_s, hc[1], "[0]")
+        self.check_forward_hidden(input_q, hc[0], "[0]")
+        self.check_forward_hidden(input_q, hc[1], "[0]")
+        return self.st_lstm_cell_cal(
+            input_l=input_l,
+            input_s=input_s,
+            input_q=input_q,
+            hidden=hc[0],
+            cell=hc[1],
+            w_ih=self.w_ih,
+            w_hh=self.w_hh,
+            w_s=self.w_s,
+            w_q=self.w_q,
+            b_ih=self.b_ih,
+            b_hh=self.b_hh,
+        )
 
 
 def cal_slot_distance(value, slots):
@@ -146,13 +170,17 @@ def cal_slot_distance(value, slots):
     higher_bound = bisect(slots, value)
     lower_bound = higher_bound - 1
     if higher_bound == len(slots):
-        return 1., 0., lower_bound, lower_bound
+        return 1.0, 0.0, lower_bound, lower_bound
     else:
         lower_value = slots[lower_bound]
         higher_value = slots[higher_bound]
         total_distance = higher_value - lower_value
-        return (value - lower_value) / total_distance, (higher_value -
-                                                        value) / total_distance, lower_bound, higher_bound
+        return (
+            (value - lower_value) / total_distance,
+            (higher_value - value) / total_distance,
+            lower_bound,
+            higher_bound,
+        )
 
 
 def cal_slot_distance_batch(batch_value, slots):
@@ -188,10 +216,10 @@ def construct_slots(min_value, max_value, num_slots, type):
     :param type: type of slots to construct, 'linear' or 'exp'.
     :return: values of slots.
     """
-    if type == 'exp':
+    if type == "exp":
         n = (max_value - min_value) / (math.exp(num_slots - 1) - 1)
         return [n * (math.exp(x) - 1) + min_value for x in range(num_slots)]
-    elif type == 'linear':
+    elif type == "linear":
         n = (max_value - min_value) / (num_slots - 1)
         return [n * x + min_value for x in range(num_slots)]
 
@@ -208,6 +236,7 @@ class STLSTM(nn.Module):
         >>> input_q = torch.randn(6, 3, 10)
         >>> hidden_out, cell_out = st_lstm(input_l, input_s, input_q)
     """
+
     def __init__(self, input_size, hidden_size, bias=True):
         """
         :param input_size: The number of expected features in the input `x`
@@ -224,7 +253,9 @@ class STLSTM(nn.Module):
         if not (input_l.size(1) == input_s.size(1) == input_q.size(1)):
             raise RuntimeError(
                 "input has inconsistent input_size: got {}, expected {}".format(
-                    input.size(1), self.input_size))
+                    input.size(1), self.input_size
+                )
+            )
 
     def forward(self, input_l, input_s, input_q, hc=None):
         """
@@ -238,7 +269,9 @@ class STLSTM(nn.Module):
         output_hidden, output_cell = [], []
         self.check_forward_input(input_l, input_s, input_q)
         for step in range(input_l.size(1)):
-            hc = self.cell(input_l[:, step, :], input_s[:, step, :], input_q[:, step, :], hc)
+            hc = self.cell(
+                input_l[:, step, :], input_s[:, step, :], input_q[:, step, :], hc
+            )
             output_hidden.append(hc[0])
             output_cell.append(hc[1])
         return torch.stack(output_hidden, 1), torch.stack(output_cell, 1)
@@ -248,20 +281,24 @@ class HSTLSTM(AbstractModel):
     """
     RNN classifier using ST-LSTM as its core.
     """
+
     def __init__(self, config, data_feature):
-        """
-        """
+        """ """
         super(HSTLSTM, self).__init__(config, data_feature)
-        self.tim_slot_max = data_feature['tim_slot_max']
-        self.dis_slot_max = data_feature['dis_slot_max']
-        self.tim_slot_len = min(config['tim_slot_len'], self.tim_slot_max + 1)
-        self.dis_slot_len = min(config['dis_slot_len'], self.dis_slot_max + 1)
-        self.tim_slots = np.linspace(0, self.tim_slot_max, self.tim_slot_len).astype(int)
-        self.dis_slots = np.linspace(0, self.dis_slot_max, self.dis_slot_len).astype(int)
+        self.tim_slot_max = data_feature["tim_slot_max"]
+        self.dis_slot_max = data_feature["dis_slot_max"]
+        self.tim_slot_len = min(config["tim_slot_len"], self.tim_slot_max + 1)
+        self.dis_slot_len = min(config["dis_slot_len"], self.dis_slot_max + 1)
+        self.tim_slots = np.linspace(0, self.tim_slot_max, self.tim_slot_len).astype(
+            int
+        )
+        self.dis_slots = np.linspace(0, self.dis_slot_max, self.dis_slot_len).astype(
+            int
+        )
         self.embed_size = config["embed_size"]
-        self.hidden_size = config['hidden_size']
-        self.loc_size = data_feature['loc_size']
-        self.device = config['device']
+        self.hidden_size = config["hidden_size"]
+        self.loc_size = data_feature["loc_size"]
+        self.device = config["device"]
         # Initialization of network parameters.
         self.st_lstm = STLSTM(self.embed_size, self.hidden_size)
         # output layer
@@ -309,8 +346,12 @@ class HSTLSTM(AbstractModel):
         :return: prediction result of this batch, size (batch_size, output_size, step).
         """
 
-        t_ld, t_hd, t_l, t_h = self.place_parameters(*cal_slot_distance_batch(batch_t.tolist(), self.tim_slots))
-        d_ld, d_hd, d_l, d_h = self.place_parameters(*cal_slot_distance_batch(batch_d.tolist(), self.dis_slots))
+        t_ld, t_hd, t_l, t_h = self.place_parameters(
+            *cal_slot_distance_batch(batch_t.tolist(), self.tim_slots)
+        )
+        d_ld, d_hd, d_l, d_h = self.place_parameters(
+            *cal_slot_distance_batch(batch_d.tolist(), self.dis_slots)
+        )
 
         batch_s = self.cal_inter(t_ld, t_hd, t_l, t_h, self.embed_s)
         batch_q = self.cal_inter(d_ld, d_hd, d_l, d_h, self.embed_q)
@@ -322,7 +363,9 @@ class HSTLSTM(AbstractModel):
         final_out_index = torch.tensor(origin_len) - 1
         final_out_index = final_out_index.reshape(final_out_index.shape[0], 1, -1)
         final_out_index = final_out_index.repeat(1, 1, self.hidden_size).to(self.device)
-        out = torch.gather(hidden_out, 1, final_out_index).squeeze(1)  # batch_size * hidden_size
+        out = torch.gather(hidden_out, 1, final_out_index).squeeze(
+            1
+        )  # batch_size * hidden_size
         linear_out = self.linear(out)
         return F.log_softmax(linear_out, dim=1)
 
@@ -335,10 +378,10 @@ class HSTLSTM(AbstractModel):
         :param batch_d: batch of spatial distance value, size (batch_size, step)
         :return: batch of predicted class indices, size (batch_size).
         """
-        batch_l = batch['current_loc']
-        batch_t = batch['tim_interval']
-        batch_d = batch['dis']
-        origin_len = batch.get_origin_len('current_loc')
+        batch_l = batch["current_loc"]
+        batch_t = batch["tim_interval"]
+        batch_d = batch["dis"]
+        origin_len = batch.get_origin_len("current_loc")
         return self.forward(batch_l, batch_t, batch_d, origin_len)
 
     def calculate_loss(self, batch):
@@ -352,11 +395,11 @@ class HSTLSTM(AbstractModel):
         :param batch_label: batch of label, size (batch_size)
         :return: loss value.
         """
-        batch_l = batch['current_loc']
-        batch_t = batch['tim_interval']
-        batch_d = batch['dis']
-        origin_len = batch.get_origin_len('current_loc')
+        batch_l = batch["current_loc"]
+        batch_t = batch["tim_interval"]
+        batch_d = batch["dis"]
+        origin_len = batch.get_origin_len("current_loc")
         prediction = self.forward(batch_l, batch_t, batch_d, origin_len)
-        batch_label = batch['target']
+        batch_label = batch["target"]
 
         return self.loss_func(prediction, batch_label)

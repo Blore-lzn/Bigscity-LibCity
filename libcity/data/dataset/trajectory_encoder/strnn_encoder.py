@@ -1,33 +1,48 @@
 import os
 import numpy as np
-from libcity.data.dataset.trajectory_encoder.abstract_trajectory_encoder import AbstractTrajectoryEncoder
+from libcity.data.dataset.trajectory_encoder.abstract_trajectory_encoder import (
+    AbstractTrajectoryEncoder,
+)
 from libcity.utils import parse_time, cal_basetime, cal_timeoff
 
-parameter_list = ['dataset', 'min_session_len', 'min_sessions', 'traj_encoder', 'cut_method',
-                  'window_size', 'history_type']
+parameter_list = [
+    "dataset",
+    "min_session_len",
+    "min_sessions",
+    "traj_encoder",
+    "cut_method",
+    "window_size",
+    "history_type",
+]
 
 
 class StrnnEncoder(AbstractTrajectoryEncoder):
-
     def __init__(self, config):
         super().__init__(config)
         self.uid = 0
         self.location2id = {}  # 因为原始数据集中的部分 loc id 不会被使用到因此这里需要重新编码一下
         self.loc_id = 0
         self.tim_max = 0  # 记录最大的时间编码
-        self.feature_dict = {'current_loc': 'int', 'current_tim': 'int',
-                             'target': 'int', 'target_tim': 'int', 'uid': 'int', 'current_dis': 'float'
-                             }
-        parameters_str = ''
+        self.feature_dict = {
+            "current_loc": "int",
+            "current_tim": "int",
+            "target": "int",
+            "target_tim": "int",
+            "uid": "int",
+            "current_dis": "float",
+        }
+        parameters_str = ""
         for key in parameter_list:
             if key in self.config:
-                parameters_str += '_' + str(self.config[key])
+                parameters_str += "_" + str(self.config[key])
         self.cache_file_name = os.path.join(
-            './libcity/cache/dataset_cache/', 'trajectory_{}.json'.format(parameters_str))
+            "./libcity/cache/dataset_cache/",
+            "trajectory_{}.json".format(parameters_str),
+        )
 
         self.geo_coord = {}
-        self.dataset = self.config.get('dataset', '')
-        self.geo_file = self.config.get('geo_file', self.dataset)
+        self.dataset = self.config.get("dataset", "")
+        self.geo_file = self.config.get("geo_file", self.dataset)
         path = "./raw_data/{}/{}.geo".format(self.dataset, self.geo_file)
         f_geo = open(path)
         lines = f_geo.readlines()
@@ -35,9 +50,19 @@ class StrnnEncoder(AbstractTrajectoryEncoder):
         for i, line in enumerate(lines):
             if i == 0:
                 continue
-            tokens = line.strip().replace("\"", "").replace("[", "").replace("]", "").split(',')
+            tokens = (
+                line.strip()
+                .replace('"', "")
+                .replace("[", "")
+                .replace("]", "")
+                .split(",")
+            )
 
-            loc_id, loc_longi, loc_lati = int(tokens[0]), eval(tokens[2]), eval(tokens[3])
+            loc_id, loc_longi, loc_lati = (
+                int(tokens[0]),
+                eval(tokens[2]),
+                eval(tokens[3]),
+            )
             self.geo_coord[loc_id] = [loc_lati, loc_longi]
         f_geo.close()
 
@@ -90,7 +115,9 @@ class StrnnEncoder(AbstractTrajectoryEncoder):
             lati = np.array([lati for i in range(len(current_loc))])
             longi = self.geo_coord[current_points[-1]][1]
             longi = np.array([longi for i in range(len(current_loc))])
-            current_dis = euclidean_dist(lati - current_lati[:-1], longi - current_longi[:-1])
+            current_dis = euclidean_dist(
+                lati - current_lati[:-1], longi - current_longi[:-1]
+            )
             trace.append(current_loc)
             trace.append(current_tim)
             trace.append(target)
@@ -105,17 +132,17 @@ class StrnnEncoder(AbstractTrajectoryEncoder):
         tim_pad = self.tim_max + 1
         dis_pad = 0.0
         self.pad_item = {
-            'current_loc': loc_pad,
-            'current_tim': tim_pad,
-            'current_dis': dis_pad
+            "current_loc": loc_pad,
+            "current_tim": tim_pad,
+            "current_dis": dis_pad,
         }
         self.data_feature = {
-            'loc_size': self.loc_id + 1,
-            'tim_size': self.tim_max + 2,
-            'uid_size': self.uid,
-            'loc_pad': loc_pad,
-            'tim_pad': tim_pad,
-            'dis_pad': dis_pad
+            "loc_size": self.loc_id + 1,
+            "tim_size": self.tim_max + 2,
+            "uid_size": self.uid,
+            "loc_pad": loc_pad,
+            "tim_pad": tim_pad,
+            "dis_pad": dis_pad,
         }
 
 

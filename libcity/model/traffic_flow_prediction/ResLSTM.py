@@ -19,7 +19,9 @@ def calculate_normalized_laplacian(adj):
     D_hat = np.array(np.sum(A_hat, axis=0))[0]
     D_hat_sqrt = [sqrt(x) for x in D_hat]
     D_hat_sqrt = np.array(np.diag(D_hat_sqrt))
-    D_hat_sqrtm_inv = np.linalg.inv(D_hat_sqrt)  # get the D_hat**-1/2 (开方后求逆即为矩阵的-1/2次方)
+    D_hat_sqrtm_inv = np.linalg.inv(
+        D_hat_sqrt
+    )  # get the D_hat**-1/2 (开方后求逆即为矩阵的-1/2次方)
     # D_A_final = D_hat**-1/2 * A_hat *D_hat**-1/2
     D_A_final = np.dot(D_hat_sqrtm_inv, A_hat)
     D_A_final = np.dot(D_A_final, D_hat_sqrtm_inv)
@@ -53,7 +55,7 @@ class Unit(nn.Module):
         out = self.bn2(out)
         out = self.relu2(out)
         out = self.conv3(out)
-        out = res+out
+        out = res + out
         return out
 
 
@@ -90,17 +92,17 @@ class ConvBlock(nn.Module):
 class ResLSTM(AbstractTrafficStateModel):
     def __init__(self, config, data_feature):
         super().__init__(config, data_feature)
-        self._scaler = self.data_feature.get('scaler')
-        self.adj_mx = self.data_feature.get('adj_mx')
+        self._scaler = self.data_feature.get("scaler")
+        self.adj_mx = self.data_feature.get("adj_mx")
         self.adj_mx = calculate_normalized_laplacian(self.adj_mx)
-        self.num_nodes = data_feature.get('num_nodes', 276)
-        self.output_dim = self.data_feature.get('output_dim', 2)
-        self.ext_dim = self.data_feature.get('ext_dim', 11)
-        self.batch_size = config.get('batch_size', 64)
-        self.time_lag = config.get('time_lag', 6)
-        self.output_window = config.get('output_window', 1)
+        self.num_nodes = data_feature.get("num_nodes", 276)
+        self.output_dim = self.data_feature.get("output_dim", 2)
+        self.ext_dim = self.data_feature.get("ext_dim", 11)
+        self.batch_size = config.get("batch_size", 64)
+        self.time_lag = config.get("time_lag", 6)
+        self.output_window = config.get("output_window", 1)
         self._logger = getLogger()
-        self.device = config.get('device', torch.device('cpu'))
+        self.device = config.get("device", torch.device("cpu"))
 
         self.conv_block1 = ConvBlock(3, self.num_nodes)
         self.conv_block2 = ConvBlock(3, self.num_nodes)
@@ -112,7 +114,7 @@ class ResLSTM(AbstractTrafficStateModel):
             self.fc2 = nn.Linear(self.num_nodes, self.num_nodes)
         self.lstm3 = nn.LSTM(input_size=1, hidden_size=128, num_layers=2)
         self.att = Attention3dBlock(self.num_nodes)
-        self.fc_last = nn.Linear(self.num_nodes*128, self.num_nodes)
+        self.fc_last = nn.Linear(self.num_nodes * 128, self.num_nodes)
 
     def fourth_pro(self, x):
         x = x.contiguous().view(x.shape[0], -1)
@@ -126,13 +128,19 @@ class ResLSTM(AbstractTrafficStateModel):
 
     def forward(self, batch):
         input1_ = batch["X"][:, :, :, 0].permute(0, 2, 1)
-        input1_ = input1_.reshape(input1_.shape[0], self.num_nodes, self.time_lag - 1, -1)
+        input1_ = input1_.reshape(
+            input1_.shape[0], self.num_nodes, self.time_lag - 1, -1
+        )
         input1_ = input1_.permute(0, 3, 1, 2)
         input2_ = batch["X"][:, :, :, 1].permute(0, 2, 1)
-        input2_ = input2_.reshape(input2_.shape[0], self.num_nodes, self.time_lag - 1, -1)
+        input2_ = input2_.reshape(
+            input2_.shape[0], self.num_nodes, self.time_lag - 1, -1
+        )
         input2_ = input2_.permute(0, 3, 1, 2)
-        input3_ = batch["X"][:, -self.time_lag+1:, :, 0].permute(0, 2, 1)
-        input3_ = torch.tensor(self.adj_mx, device=self.device, dtype=torch.float32).matmul(input3_)
+        input3_ = batch["X"][:, -self.time_lag + 1 :, :, 0].permute(0, 2, 1)
+        input3_ = torch.tensor(
+            self.adj_mx, device=self.device, dtype=torch.float32
+        ).matmul(input3_)
         input3_ = input3_.unsqueeze(1)
 
         p1 = self.conv_block1(input1_)
@@ -141,7 +149,9 @@ class ResLSTM(AbstractTrafficStateModel):
 
         out = p1 + p2 + p3  # (64, 276)
         if self.ext_dim > 0:
-            input4_ = batch["X"][:, -self.time_lag + 1:, 0, -self.ext_dim:].permute(0, 2, 1)
+            input4_ = batch["X"][:, -self.time_lag + 1 :, 0, -self.ext_dim :].permute(
+                0, 2, 1
+            )
             p4 = self.fourth_pro(input4_)
             out += p4
 
@@ -154,10 +164,12 @@ class ResLSTM(AbstractTrafficStateModel):
         return out
 
     def calculate_loss(self, batch, batches_seen=None):
-        y_true = batch['y']
+        y_true = batch["y"]
         y_predicted = self.predict(batch)
-        y_true = self._scaler.inverse_transform(y_true[..., :self.output_dim])
-        y_predicted = self._scaler.inverse_transform(y_predicted[..., :self.output_dim])
+        y_true = self._scaler.inverse_transform(y_true[..., : self.output_dim])
+        y_predicted = self._scaler.inverse_transform(
+            y_predicted[..., : self.output_dim]
+        )
         return loss.masked_mae_torch(y_predicted, y_true)
 
     def predict(self, batch):

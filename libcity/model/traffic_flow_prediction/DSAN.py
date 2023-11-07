@@ -30,9 +30,13 @@ def spatial_posenc(r, c, d, device):
     Returns:
 
     """
-    angle_rads_r = get_angles(pos=r, l=np.arange(d)[np.newaxis, :], d=d)  # l and ret with shape (1, d)
+    angle_rads_r = get_angles(
+        pos=r, l=np.arange(d)[np.newaxis, :], d=d
+    )  # l and ret with shape (1, d)
 
-    angle_rads_c = get_angles(pos=c, l=np.arange(d)[np.newaxis, :], d=d)  # l and ret with shape (1, d)
+    angle_rads_c = get_angles(
+        pos=c, l=np.arange(d)[np.newaxis, :], d=d
+    )  # l and ret with shape (1, d)
 
     pos_encoding = torch.zeros(size=angle_rads_r.shape, device=device)  # shape (1, d)
 
@@ -66,9 +70,11 @@ def cal_attention(Q, K, V, M, n_h):
     if M is not None:
         M = M.unsqueeze(2)
         M = M.repeat(QK_d_h.shape[0] // M.shape[0], 1, 1, 1, 1)
-        QK_d_h += (M * -1e9)
+        QK_d_h += M * -1e9
 
-    attention_weights = torch.softmax(input=QK_d_h, dim=-1)  # (h, L_q, L_k) softmax along key axis
+    attention_weights = torch.softmax(
+        input=QK_d_h, dim=-1
+    )  # (h, L_q, L_k) softmax along key axis
 
     output = torch.matmul(attention_weights, V)  # (h, L_q, d)
 
@@ -87,9 +93,7 @@ def two_layer_ffn(d, num_hid, input_dim):
 
     """
     return nn.Sequential(
-        nn.Linear(input_dim, num_hid),
-        nn.ReLU(),
-        nn.Linear(num_hid, d)
+        nn.Linear(input_dim, num_hid), nn.ReLU(), nn.Linear(num_hid, d)
     )
 
 
@@ -108,7 +112,7 @@ def ex_encoding(d, num_hid, input_dim):
         nn.Linear(in_features=input_dim, out_features=num_hid),
         nn.ReLU(),
         nn.Linear(in_features=num_hid, out_features=d),
-        nn.Sigmoid()
+        nn.Sigmoid(),
     )
 
 
@@ -154,15 +158,21 @@ def create_masks(inp_g, inp_l, tar):
 
     threshold_mask_g = create_threshold_mask(inp_g).unsqueeze(2)
     inp_l = inp_l.permute([0, 2, 3, 1, 4, 5, 6])
-    inp_l = torch.reshape(inp_l,
-                          [inp_l.shape[0] * inp_l.shape[1] * inp_l.shape[2], inp_l.shape[3], inp_l.shape[4],
-                           inp_l.shape[5], inp_l.shape[6]])
+    inp_l = torch.reshape(
+        inp_l,
+        [
+            inp_l.shape[0] * inp_l.shape[1] * inp_l.shape[2],
+            inp_l.shape[3],
+            inp_l.shape[4],
+            inp_l.shape[5],
+            inp_l.shape[6],
+        ],
+    )
     threshold_mask = create_threshold_mask(inp_l).unsqueeze(2)
     look_ahead_mask = create_look_ahead_mask(tar.shape[1])
     tar = tar.permute(0, 2, 1, 3)
     tar = torch.reshape(tar, [tar.shape[0] * tar.shape[1], tar.shape[2], tar.shape[3]])
-    dec_target_threshold_mask = create_threshold_mask_tar(
-        tar).unsqueeze(1).unsqueeze(2)
+    dec_target_threshold_mask = create_threshold_mask_tar(tar).unsqueeze(1).unsqueeze(2)
     combined_mask = torch.max(dec_target_threshold_mask, look_ahead_mask)
     return threshold_mask_g, threshold_mask, combined_mask
 
@@ -187,13 +197,42 @@ class Convs(nn.Module):
         self.input_window = input_window
 
         self.convs = nn.ModuleList(
-            [nn.ModuleList([nn.Conv2d(in_channels=input_dim, out_channels=n_filter, kernel_size=(3, 3), padding=(1, 1))
-                            for _ in range(input_window)])])
+            [
+                nn.ModuleList(
+                    [
+                        nn.Conv2d(
+                            in_channels=input_dim,
+                            out_channels=n_filter,
+                            kernel_size=(3, 3),
+                            padding=(1, 1),
+                        )
+                        for _ in range(input_window)
+                    ]
+                )
+            ]
+        )
         self.convs += nn.ModuleList(
-            [nn.ModuleList([nn.Conv2d(in_channels=n_filter, out_channels=n_filter, kernel_size=(3, 3), padding=(1, 1))
-                            for _ in range(input_window)]) for _ in range(n_layer - 1)])
-        self.dropouts = nn.ModuleList([nn.ModuleList(
-            [nn.Dropout(r_d) for _ in range(input_window)]) for _ in range(n_layer)])
+            [
+                nn.ModuleList(
+                    [
+                        nn.Conv2d(
+                            in_channels=n_filter,
+                            out_channels=n_filter,
+                            kernel_size=(3, 3),
+                            padding=(1, 1),
+                        )
+                        for _ in range(input_window)
+                    ]
+                )
+                for _ in range(n_layer - 1)
+            ]
+        )
+        self.dropouts = nn.ModuleList(
+            [
+                nn.ModuleList([nn.Dropout(r_d) for _ in range(input_window)])
+                for _ in range(n_layer)
+            ]
+        )
 
     def forward(self, inps):
         """
@@ -210,13 +249,27 @@ class Convs(nn.Module):
         if len(inps.shape) == 6:
             for i in range(self.input_window):
                 outputs[i] = outputs[i].permute([0, 1, 4, 5, 2, 3])
-                outputs[i] = torch.reshape(input=outputs[i],
-                                           shape=[-1, outputs[i].shape[3], outputs[i].shape[4], outputs[i].shape[5]])
+                outputs[i] = torch.reshape(
+                    input=outputs[i],
+                    shape=[
+                        -1,
+                        outputs[i].shape[3],
+                        outputs[i].shape[4],
+                        outputs[i].shape[5],
+                    ],
+                )
         else:
             for i in range(self.input_window):
                 outputs[i] = outputs[i].permute([0, 1, 4, 2, 3])
-                outputs[i] = torch.reshape(input=outputs[i],
-                                           shape=[-1, outputs[i].shape[2], outputs[i].shape[3], outputs[i].shape[4]])
+                outputs[i] = torch.reshape(
+                    input=outputs[i],
+                    shape=[
+                        -1,
+                        outputs[i].shape[2],
+                        outputs[i].shape[3],
+                        outputs[i].shape[4],
+                    ],
+                )
 
         for i in range(self.n_layer):
             for j in range(self.input_window):
@@ -227,9 +280,17 @@ class Convs(nn.Module):
 
         output = torch.stack(outputs, dim=1)
         if len(inps.shape) == 6:
-            output = torch.reshape(input=output,
-                                   shape=[inps.shape[0], -1, output.shape[1], output.shape[2], output.shape[3],
-                                          output.shape[4]]).permute([0, 2, 4, 5, 1, 3])
+            output = torch.reshape(
+                input=output,
+                shape=[
+                    inps.shape[0],
+                    -1,
+                    output.shape[1],
+                    output.shape[2],
+                    output.shape[3],
+                    output.shape[4],
+                ],
+            ).permute([0, 2, 4, 5, 1, 3])
         else:
             output = output.permute([0, 1, 3, 4, 2])
 
@@ -279,15 +340,18 @@ class MSA(nn.Module):
         return x.permute([0, 1, 3, 2, 4])
 
     def forward(self, V, K, Q, M):
-
         # linear
         if self.self_att:
             wx_o = self.wx(Q)
-            Q, K, V = torch.split(tensor=wx_o, split_size_or_sections=wx_o.shape[-1] // 3, dim=-1)
+            Q, K, V = torch.split(
+                tensor=wx_o, split_size_or_sections=wx_o.shape[-1] // 3, dim=-1
+            )
         else:
             Q = self.wq(Q)
             wkv_o = self.wkv(K)
-            K, V = torch.split(tensor=wkv_o, split_size_or_sections=wkv_o.shape[-1] // 2, dim=-1)
+            K, V = torch.split(
+                tensor=wkv_o, split_size_or_sections=wkv_o.shape[-1] // 2, dim=-1
+            )
 
         # split head
         Q = self.split_heads(Q)
@@ -300,7 +364,8 @@ class MSA(nn.Module):
 
         d_shape = scaled_attention.shape
         concat_attention = torch.reshape(
-            scaled_attention, (d_shape[0], d_shape[1], d_shape[2], self.d))
+            scaled_attention, (d_shape[0], d_shape[1], d_shape[2], self.d)
+        )
 
         output = self.wo(concat_attention)
         return output
@@ -391,7 +456,6 @@ class DecoderLayer(nn.Module):
         self.dropout3 = nn.Dropout(r_d)
 
     def forward(self, x, kv, look_ahead_mask, threshold_mask):
-
         # first msa
         attn1 = self.msa1(x, x, x, look_ahead_mask)
         attn1 = self.dropout1(attn1)
@@ -419,7 +483,9 @@ class DAE(nn.Module):
     DAE Dynamic Attention Encoder
     """
 
-    def __init__(self, L, d, n_h, num_hid, conv_layer, input_window, input_dim, ext_dim, r_d=0.1):
+    def __init__(
+        self, L, d, n_h, num_hid, conv_layer, input_window, input_dim, ext_dim, r_d=0.1
+    ):
         """
         Dynamic Attention Encoder
         Args:
@@ -438,8 +504,20 @@ class DAE(nn.Module):
         self.L = L
 
         # conv layers to get d-dimension representations
-        self.convs_d = Convs(n_layer=conv_layer, n_filter=d, input_window=input_window, input_dim=input_dim, r_d=r_d)
-        self.convs_g = Convs(n_layer=conv_layer, n_filter=d, input_window=input_window, input_dim=input_dim, r_d=r_d)
+        self.convs_d = Convs(
+            n_layer=conv_layer,
+            n_filter=d,
+            input_window=input_window,
+            input_dim=input_dim,
+            r_d=r_d,
+        )
+        self.convs_g = Convs(
+            n_layer=conv_layer,
+            n_filter=d,
+            input_window=input_window,
+            input_dim=input_dim,
+            r_d=r_d,
+        )
 
         # get TPE
         self.ex_encoder_d = ex_encoding(d=d, num_hid=num_hid, input_dim=ext_dim)
@@ -451,9 +529,11 @@ class DAE(nn.Module):
 
         #
         self.Enc_G = nn.ModuleList(
-            [EncoderLayer(d=d, n_h=n_h, num_hid=num_hid, r_d=r_d) for _ in range(L)])
+            [EncoderLayer(d=d, n_h=n_h, num_hid=num_hid, r_d=r_d) for _ in range(L)]
+        )
         self.Enc_D = nn.ModuleList(
-            [DecoderLayer(d=d, n_h=n_h, num_hid=num_hid, r_d=r_d) for _ in range(L)])
+            [DecoderLayer(d=d, n_h=n_h, num_hid=num_hid, r_d=r_d) for _ in range(L)]
+        )
 
     def forward(self, x_d, x_g, ex, cors_d, cors_g, threshold_mask_d, threshold_mask_g):
         """
@@ -489,10 +569,25 @@ class DAE(nn.Module):
         x_d = x_d.reshape([shape[0], shape[1], -1, shape[4], self.d])
         x_g = x_g.reshape([shape[0], shape[1], -1, self.d])
 
-        TPE_d = torch.reshape(input=TPE_d, shape=[TPE_d.shape[0], TPE_d.shape[1], TPE_d.shape[2] * TPE_d.shape[3], -1,
-                                                  TPE_d.shape[-1]])
-        TPE_g = torch.reshape(input=TPE_g,
-                              shape=[TPE_g.shape[0], TPE_g.shape[1], TPE_g.shape[2] * TPE_g.shape[3], TPE_g.shape[4]])
+        TPE_d = torch.reshape(
+            input=TPE_d,
+            shape=[
+                TPE_d.shape[0],
+                TPE_d.shape[1],
+                TPE_d.shape[2] * TPE_d.shape[3],
+                -1,
+                TPE_d.shape[-1],
+            ],
+        )
+        TPE_g = torch.reshape(
+            input=TPE_g,
+            shape=[
+                TPE_g.shape[0],
+                TPE_g.shape[1],
+                TPE_g.shape[2] * TPE_g.shape[3],
+                TPE_g.shape[4],
+            ],
+        )
 
         x_d = x_d + TPE_d + SPE_d
         x_g = x_g + TPE_g + SPE_g
@@ -504,17 +599,36 @@ class DAE(nn.Module):
             x_g = self.Enc_G[i](x_g, threshold_mask_g)
 
         x_d_ = x_d.permute([0, 2, 1, 3, 4])
-        x_d_ = torch.reshape(x_d_, [x_d_.shape[0] * x_d_.shape[1], x_d_.shape[2], x_d_.shape[3], x_d_.shape[4]])
+        x_d_ = torch.reshape(
+            x_d_,
+            [
+                x_d_.shape[0] * x_d_.shape[1],
+                x_d_.shape[2],
+                x_d_.shape[3],
+                x_d_.shape[4],
+            ],
+        )
 
         for i in range(self.L):
-            x_d = self.Enc_D[i](
-                x_d_, x_g, threshold_mask_d, threshold_mask_g)
+            x_d = self.Enc_D[i](x_d_, x_g, threshold_mask_d, threshold_mask_g)
 
         return x_d
 
 
 class SAD(nn.Module):
-    def __init__(self, L, d, n_h, num_hid, conv_layer, ext_dim, input_window, output_window, device, r_d=0.1):
+    def __init__(
+        self,
+        L,
+        d,
+        n_h,
+        num_hid,
+        conv_layer,
+        ext_dim,
+        input_window,
+        output_window,
+        device,
+        r_d=0.1,
+    ):
         """
 
         Args:
@@ -542,17 +656,20 @@ class SAD(nn.Module):
         self.li_conv.add_module("linear", nn.Linear(2, d))
         self.li_conv.add_module("activation_relu", nn.ReLU())
         for i in range(conv_layer - 1):
-            self.li_conv.add_module(
-                "linear{}".format(i), nn.Linear(
-                    d, d))
+            self.li_conv.add_module("linear{}".format(i), nn.Linear(d, d))
             self.li_conv.add_module("activation_relu{}".format(i), nn.ReLU())
 
         self.dec_s = nn.ModuleList(
-            [DecoderLayer(d=d, n_h=n_h, num_hid=num_hid, r_d=r_d) for _ in range(L)])
+            [DecoderLayer(d=d, n_h=n_h, num_hid=num_hid, r_d=r_d) for _ in range(L)]
+        )
 
         self.linear = nn.Linear(in_features=input_window, out_features=output_window)
         self.dec_t = nn.ModuleList(
-            [DecoderLayer(d=d, n_h=n_h, num_hid=num_hid, r_d=r_d, revert_q=True) for _ in range(L)])
+            [
+                DecoderLayer(d=d, n_h=n_h, num_hid=num_hid, r_d=r_d, revert_q=True)
+                for _ in range(L)
+            ]
+        )
 
     def forward(self, x, ex, dae_output, look_ahead_mask):
         ex_enc = self.ex_encoder(ex)
@@ -560,8 +677,15 @@ class SAD(nn.Module):
         x = self.li_conv(x)
         x *= np.sqrt(self.d)
 
-        ex_enc = torch.reshape(input=ex_enc, shape=[ex_enc.shape[0], ex_enc.shape[1], ex_enc.shape[2] * ex_enc.shape[3],
-                                                    ex_enc.shape[4]])
+        ex_enc = torch.reshape(
+            input=ex_enc,
+            shape=[
+                ex_enc.shape[0],
+                ex_enc.shape[1],
+                ex_enc.shape[2] * ex_enc.shape[3],
+                ex_enc.shape[4],
+            ],
+        )
         x = x + ex_enc + self.pos_enc
 
         x = self.dropout(x)
@@ -570,7 +694,15 @@ class SAD(nn.Module):
         x_s = x_s.unsqueeze(3).expand(-1, -1, -1, self.output_window, -1)
 
         x_s_ = x_s.permute([0, 2, 1, 3, 4])
-        x_s_ = torch.reshape(x_s_, [x_s_.shape[0] * x_s_.shape[1], x_s_.shape[2], x_s_.shape[3], x_s_.shape[4]])
+        x_s_ = torch.reshape(
+            x_s_,
+            [
+                x_s_.shape[0] * x_s_.shape[1],
+                x_s_.shape[2],
+                x_s_.shape[3],
+                x_s_.shape[4],
+            ],
+        )
 
         # linear
         dae_output = dae_output.permute(0, 2, 3, 1)
@@ -582,10 +714,11 @@ class SAD(nn.Module):
 
         x_s_ = x_s.permute([0, 2, 1, 3])
         x_t_ = x_t.permute([0, 2, 1, 3])
-        x_t_ = torch.reshape(x_t_, [x_t_.shape[0] * x_t_.shape[1], 1, x_t_.shape[2], x_t_.shape[3]])
+        x_t_ = torch.reshape(
+            x_t_, [x_t_.shape[0] * x_t_.shape[1], 1, x_t_.shape[2], x_t_.shape[3]]
+        )
         for i in range(self.L):
-            x_t = self.dec_t[i](
-                x_t_, x_s_, look_ahead_mask, None)
+            x_t = self.dec_t[i](x_t_, x_s_, look_ahead_mask, None)
 
         output = x_t.squeeze(1)
 
@@ -597,9 +730,22 @@ class DsanUse(nn.Module):
     DSAN use
     """
 
-    def __init__(self, L, d, n_h, row, column, num_hid, conv_layer, input_window, output_window, input_dim,
-                 ext_dim,
-                 device, r_d=0.1):
+    def __init__(
+        self,
+        L,
+        d,
+        n_h,
+        row,
+        column,
+        num_hid,
+        conv_layer,
+        input_window,
+        output_window,
+        input_dim,
+        ext_dim,
+        device,
+        r_d=0.1,
+    ):
         """
 
         Args:
@@ -618,18 +764,48 @@ class DsanUse(nn.Module):
         self.column = column
 
         # DAE Dynamic Attention Encoder
-        self.dae = DAE(L=L, d=d, n_h=n_h, num_hid=num_hid, conv_layer=conv_layer,
-                       input_window=input_window, input_dim=input_dim, ext_dim=ext_dim, r_d=r_d)
+        self.dae = DAE(
+            L=L,
+            d=d,
+            n_h=n_h,
+            num_hid=num_hid,
+            conv_layer=conv_layer,
+            input_window=input_window,
+            input_dim=input_dim,
+            ext_dim=ext_dim,
+            r_d=r_d,
+        )
 
         # SAD Switch-Attention Decoder
-        self.sad = SAD(L=L, d=d, n_h=n_h, num_hid=num_hid, conv_layer=conv_layer, ext_dim=ext_dim,
-                       input_window=input_window, output_window=output_window, device=device, r_d=r_d)
+        self.sad = SAD(
+            L=L,
+            d=d,
+            n_h=n_h,
+            num_hid=num_hid,
+            conv_layer=conv_layer,
+            ext_dim=ext_dim,
+            input_window=input_window,
+            output_window=output_window,
+            device=device,
+            r_d=r_d,
+        )
 
         # final layer
         self.final_layer = nn.Linear(d, input_dim)
 
-    def forward(self, dae_inp_g, dae_inp, dae_inp_ex, sad_inp, sad_inp_ex, cors, cors_g, threshold_mask,
-                threshold_mask_g, look_ahead_mask):
+    def forward(
+        self,
+        dae_inp_g,
+        dae_inp,
+        dae_inp_ex,
+        sad_inp,
+        sad_inp_ex,
+        cors,
+        cors_g,
+        threshold_mask,
+        threshold_mask_g,
+        look_ahead_mask,
+    ):
         # DAE
         dae_output = self.dae(
             x_d=dae_inp,
@@ -638,7 +814,7 @@ class DsanUse(nn.Module):
             cors_d=cors,
             cors_g=cors_g,
             threshold_mask_d=threshold_mask,
-            threshold_mask_g=threshold_mask_g
+            threshold_mask_g=threshold_mask_g,
         )
 
         # SAD
@@ -646,14 +822,16 @@ class DsanUse(nn.Module):
             x=sad_inp,
             ex=sad_inp_ex,
             dae_output=dae_output,
-            look_ahead_mask=look_ahead_mask
+            look_ahead_mask=look_ahead_mask,
         )
 
         # final layer
         final_output = self.final_layer(sad_output)
         final_output = torch.tanh(final_output)
-        final_output = torch.reshape(final_output,
-                                     [-1, self.column, self.row, final_output.shape[-2], final_output.shape[-1]])
+        final_output = torch.reshape(
+            final_output,
+            [-1, self.column, self.row, final_output.shape[-2], final_output.shape[-1]],
+        )
 
         final_output = final_output.permute([0, 3, 2, 1, 4])
 
@@ -665,33 +843,44 @@ class DSAN(AbstractTrafficStateModel):
         super().__init__(config, data_feature)
 
         # device
-        self.device = config.get('device', torch.device('cpu'))
+        self.device = config.get("device", torch.device("cpu"))
 
         # data_feature
-        self._scaler = self.data_feature.get('scaler')  # 用于数据归一化
+        self._scaler = self.data_feature.get("scaler")  # 用于数据归一化
         # self.adj_mx = torch.tensor(self.data_feature.get('adj_mx'), device=self.device)
-        self.len_row = self.data_feature.get('len_row', 16)  # row
-        self.len_column = self.data_feature.get('len_column', 12)  # column
-        self.num_nodes = self.data_feature.get('num_nodes', 1)  # len_row * len_column
-        self.feature_dim = self.data_feature.get('feature_dim', 1)  # 输入维度
-        self.ext_dim = self.data_feature.get('ext_dim', 1)  # 额外数据的维度
-        self.output_dim = self.data_feature.get('output_dim', 1)  # b in paper
+        self.len_row = self.data_feature.get("len_row", 16)  # row
+        self.len_column = self.data_feature.get("len_column", 12)  # column
+        self.num_nodes = self.data_feature.get("num_nodes", 1)  # len_row * len_column
+        self.feature_dim = self.data_feature.get("feature_dim", 1)  # 输入维度
+        self.ext_dim = self.data_feature.get("ext_dim", 1)  # 额外数据的维度
+        self.output_dim = self.data_feature.get("output_dim", 1)  # b in paper
 
         # config
-        self.input_window = config.get('input_window', 12)  # l in paper
-        self.output_window = config.get('output_window', 12)  # F in paper
-        self.L = config.get('L', 3)  # num of layers in Enc-G/D / Dec-S/T
-        self.d = config.get('d', 64)  # d-dimension representations
-        self.n_h = config.get('n_h', 8)  # num of head in Multi-space Attention
+        self.input_window = config.get("input_window", 12)  # l in paper
+        self.output_window = config.get("output_window", 12)  # F in paper
+        self.L = config.get("L", 3)  # num of layers in Enc-G/D / Dec-S/T
+        self.d = config.get("d", 64)  # d-dimension representations
+        self.n_h = config.get("n_h", 8)  # num of head in Multi-space Attention
         self.num_hid = 4 * self.d  # hidden layer size
-        self.B = config.get('B', 3)  # num of layers in conv
-        self.l_d = config.get('l_d', 3)
-        self.r_d = config.get('r_d', 0.1)  # dropout rate
+        self.B = config.get("B", 3)  # num of layers in conv
+        self.l_d = config.get("l_d", 3)
+        self.r_d = config.get("r_d", 0.1)  # dropout rate
 
-        self.dsan = DsanUse(L=self.L, d=self.d, n_h=self.n_h, row=self.len_row, column=self.len_column,
-                            num_hid=self.num_hid, conv_layer=self.B,
-                            input_window=self.input_window, output_window=self.output_window,
-                            input_dim=self.output_dim, ext_dim=self.ext_dim, device=self.device, r_d=self.r_d)
+        self.dsan = DsanUse(
+            L=self.L,
+            d=self.d,
+            n_h=self.n_h,
+            row=self.len_row,
+            column=self.len_column,
+            num_hid=self.num_hid,
+            conv_layer=self.B,
+            input_window=self.input_window,
+            output_window=self.output_window,
+            input_dim=self.output_dim,
+            ext_dim=self.ext_dim,
+            device=self.device,
+            r_d=self.r_d,
+        )
 
     def generate_x(self, batch):
         """
@@ -712,71 +901,116 @@ class DSAN(AbstractTrafficStateModel):
             y:
 
         """
-        X = batch['X'][:, :, :, :, :self.output_dim]
-        X_ext = batch['X'][:, :, :, :, self.output_dim:]
+        X = batch["X"][:, :, :, :, : self.output_dim]
+        X_ext = batch["X"][:, :, :, :, self.output_dim :]
         X_shape = X.shape  # [batch_size, input_window, row, column, feature_dim]
         l_d = self.l_d
 
         # dae_inp_g
-        dae_inp_g = torch.reshape(input=X, shape=[X_shape[0], X_shape[1], X_shape[2], X_shape[3], X_shape[4]])
+        dae_inp_g = torch.reshape(
+            input=X, shape=[X_shape[0], X_shape[1], X_shape[2], X_shape[3], X_shape[4]]
+        )
 
         # dae_inp
         L_d = 2 * l_d + 1  # l_d: half length of the block (L_d = 2 * l_d + 1)
 
-        dae_inp = torch.zeros(size=[X_shape[0], X_shape[1], X_shape[2], X_shape[3], L_d, L_d, X_shape[4]],
-                              device=self.device)
+        dae_inp = torch.zeros(
+            size=[X_shape[0], X_shape[1], X_shape[2], X_shape[3], L_d, L_d, X_shape[4]],
+            device=self.device,
+        )
         for i in range(X_shape[2]):
             for j in range(X_shape[3]):
-                dae_inp[:, :, i, j, max(0, l_d - i):min(L_d, X_shape[2] - i + l_d),
-                max(0, l_d - j):min(L_d, X_shape[3] - j + l_d), :] = \
-                    X[:, :, max(0, i - l_d):min(X_shape[2], i + l_d + 1), max(0, j - l_d):min(X_shape[3], j + l_d + 1),
-                    :]
+                dae_inp[
+                    :,
+                    :,
+                    i,
+                    j,
+                    max(0, l_d - i) : min(L_d, X_shape[2] - i + l_d),
+                    max(0, l_d - j) : min(L_d, X_shape[3] - j + l_d),
+                    :,
+                ] = X[
+                    :,
+                    :,
+                    max(0, i - l_d) : min(X_shape[2], i + l_d + 1),
+                    max(0, j - l_d) : min(X_shape[3], j + l_d + 1),
+                    :,
+                ]
 
         # dae_inp_ex
         dae_inp_ex = X_ext
 
         # sad_inp
-        sad_inp = torch.reshape(input=X[:, -self.output_window:, :, :, :self.output_dim],
-                                shape=[X_shape[0], -1, X_shape[2] * X_shape[3], X_shape[4]])
+        sad_inp = torch.reshape(
+            input=X[:, -self.output_window :, :, :, : self.output_dim],
+            shape=[X_shape[0], -1, X_shape[2] * X_shape[3], X_shape[4]],
+        )
 
         # sad_inp_ex
-        sad_inp_ex = X_ext[:, -self.output_window:, :, :, :]
+        sad_inp_ex = X_ext[:, -self.output_window :, :, :, :]
 
         # cors
         cors = torch.zeros(size=[L_d, L_d, self.d], device=self.device)
         for i in range(L_d):
             for j in range(L_d):
-                cors[i, j, :] = spatial_posenc(i - L_d // 2, j - L_d // 2, self.d, device=self.device)
+                cors[i, j, :] = spatial_posenc(
+                    i - L_d // 2, j - L_d // 2, self.d, device=self.device
+                )
 
-        cors = torch.reshape(input=cors, shape=[1, 1, cors.shape[0] * cors.shape[1], cors.shape[2]])
+        cors = torch.reshape(
+            input=cors, shape=[1, 1, cors.shape[0] * cors.shape[1], cors.shape[2]]
+        )
 
         # cors_g
-        cors_g = torch.zeros(size=[self.len_row, self.len_column, self.d], device=self.device)
+        cors_g = torch.zeros(
+            size=[self.len_row, self.len_column, self.d], device=self.device
+        )
         for i in range(self.len_row):
             for j in range(self.len_column):
-                cors_g[i, j, :] = spatial_posenc(i - self.len_row // 2, j - self.len_column // 2, self.d,
-                                                 device=self.device)
-        cors_g = torch.reshape(input=cors_g, shape=[1, cors_g.shape[0] * cors_g.shape[1], cors_g.shape[2]])
+                cors_g[i, j, :] = spatial_posenc(
+                    i - self.len_row // 2,
+                    j - self.len_column // 2,
+                    self.d,
+                    device=self.device,
+                )
+        cors_g = torch.reshape(
+            input=cors_g, shape=[1, cors_g.shape[0] * cors_g.shape[1], cors_g.shape[2]]
+        )
 
         # y
-        y = batch['y']
+        y = batch["y"]
 
         return dae_inp_g, dae_inp, dae_inp_ex, sad_inp, sad_inp_ex, cors, cors_g, y
 
     def predict(self, batch):
-
         # generate x
-        dae_inp_g, dae_inp, dae_inp_ex, sad_inp, sad_inp_ex, cors, cors_g, y = \
-            self.generate_x(batch=batch)
+        (
+            dae_inp_g,
+            dae_inp,
+            dae_inp_ex,
+            sad_inp,
+            sad_inp_ex,
+            cors,
+            cors_g,
+            y,
+        ) = self.generate_x(batch=batch)
 
         # generate mask
         threshold_mask_g, threshold_mask, combined_mask = create_masks(
-            dae_inp_g[..., :self.output_dim], dae_inp[..., :self.output_dim], sad_inp)
+            dae_inp_g[..., : self.output_dim], dae_inp[..., : self.output_dim], sad_inp
+        )
 
         # reshape
-        dae_inp = torch.reshape(input=dae_inp,
-                                shape=[dae_inp.shape[0], dae_inp.shape[1], dae_inp.shape[2], dae_inp.shape[3],
-                                       dae_inp.shape[4] * dae_inp.shape[5], dae_inp.shape[6]])
+        dae_inp = torch.reshape(
+            input=dae_inp,
+            shape=[
+                dae_inp.shape[0],
+                dae_inp.shape[1],
+                dae_inp.shape[2],
+                dae_inp.shape[3],
+                dae_inp.shape[4] * dae_inp.shape[5],
+                dae_inp.shape[6],
+            ],
+        )
 
         res = self.dsan(
             dae_inp_g=dae_inp_g,
@@ -788,13 +1022,13 @@ class DSAN(AbstractTrafficStateModel):
             cors_g=cors_g,
             threshold_mask=threshold_mask,
             threshold_mask_g=threshold_mask_g,
-            look_ahead_mask=combined_mask
+            look_ahead_mask=combined_mask,
         )
         return res
 
     def calculate_loss(self, batch):
-        y_true = batch['y']
+        y_true = batch["y"]
         y_pred = self.predict(batch)
-        y_true = self._scaler.inverse_transform(y_true[..., :self.output_dim])
-        y_predicted = self._scaler.inverse_transform(y_pred[..., :self.output_dim])
+        y_true = self._scaler.inverse_transform(y_true[..., : self.output_dim])
+        y_predicted = self._scaler.inverse_transform(y_pred[..., : self.output_dim])
         return masked_rmse_torch(y_predicted, y_true, 0)

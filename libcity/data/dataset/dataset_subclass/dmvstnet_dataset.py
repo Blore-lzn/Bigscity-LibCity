@@ -13,20 +13,23 @@ from libcity.data.dataset import TrafficStateGridDataset
 
 
 class DMVSTNetDataset(TrafficStateGridDataset):
-
     def __init__(self, config):
         super().__init__(config)
         self.points_per_hour = 3600 // self.time_intervals  # 每小时的时间片数
-        self.period = 7 * 24 * self.points_per_hour  # 一周的时间点数目，间隔为5min，用于求dtw_edge_index
-        self.load_from_local = self.config.get('load_from_local', True)
-        self.dtw_power = self.config.get('dtw_power', 0.75)
-        cache_path = './libcity/cache/dataset_cache/dtw_graph_' + self.dataset + '.npz'
-        if self.load_from_local and os.path.exists(cache_path):  # 提前算好了dtw_edge_index，并从本地导入
-            with open(cache_path, 'rb') as f:
+        self.period = (
+            7 * 24 * self.points_per_hour
+        )  # 一周的时间点数目，间隔为5min，用于求dtw_edge_index
+        self.load_from_local = self.config.get("load_from_local", True)
+        self.dtw_power = self.config.get("dtw_power", 0.75)
+        cache_path = "./libcity/cache/dataset_cache/dtw_graph_" + self.dataset + ".npz"
+        if self.load_from_local and os.path.exists(
+            cache_path
+        ):  # 提前算好了dtw_edge_index，并从本地导入
+            with open(cache_path, "rb") as f:
                 self.dtw_graph = pickle.load(f)
         else:  # 临时求dtw_matirx (临时求会耗时很久)
             self.dtw_graph = self.get_dtw_grpah()
-            with open(cache_path, 'wb') as f:
+            with open(cache_path, "wb") as f:
                 pickle.dump(self.dtw_graph, f)
 
     # 返回语义邻接边集（该部分直接截取自源码，做为函数直接调用）
@@ -45,10 +48,10 @@ class DMVSTNetDataset(TrafficStateGridDataset):
         order = np.arange(line).reshape(line, 1)
         df = np.concatenate((df, order), axis=1)
         df = pd.DataFrame(df)
-        df['symbol'] = df[self.num_nodes] % self.period
+        df["symbol"] = df[self.num_nodes] % self.period
 
         for i in tqdm(range(self.period)):
-            df_i = df[df['symbol'] == i]
+            df_i = df[df["symbol"] == i]
             values_i = df_i.values[:, :-1]
             mean_i = np.mean(values_i, axis=0)[np.newaxis, :]
             if i == 0:
@@ -114,9 +117,15 @@ class DMVSTNetDataset(TrafficStateGridDataset):
         Returns:
             dict: 包含数据集的相关特征的字典
         """
-        return {"scaler": self.scaler, "adj_mx": self.adj_mx,
-                "num_nodes": self.num_nodes, "feature_dim": self.feature_dim, "ext_dim": self.ext_dim,
-
-                "output_dim": self.output_dim, "len_row": self.len_row, "len_column": self.len_column,
-                "dtw_graph": self.dtw_graph,  # 将语义邻接图作为data_feature返回
-                "num_batches": self.num_batches}
+        return {
+            "scaler": self.scaler,
+            "adj_mx": self.adj_mx,
+            "num_nodes": self.num_nodes,
+            "feature_dim": self.feature_dim,
+            "ext_dim": self.ext_dim,
+            "output_dim": self.output_dim,
+            "len_row": self.len_row,
+            "len_column": self.len_column,
+            "dtw_graph": self.dtw_graph,  # 将语义邻接图作为data_feature返回
+            "num_batches": self.num_batches,
+        }

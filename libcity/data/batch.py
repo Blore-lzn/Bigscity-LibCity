@@ -3,7 +3,6 @@ import numpy as np
 
 
 class Batch(object):
-
     def __init__(self, feature_name):
         """Summary of class here
 
@@ -20,13 +19,13 @@ class Batch(object):
         if key in self.data:
             return self.data[key]
         else:
-            raise KeyError('{} is not in the batch'.format(key))
+            raise KeyError("{} is not in the batch".format(key))
 
     def __setitem__(self, key, value):
         if key in self.data:
             self.data[key] = value
         else:
-            raise KeyError('{} is not in the batch'.format(key))
+            raise KeyError("{} is not in the batch".format(key))
 
     def append(self, item):
         """
@@ -36,7 +35,9 @@ class Batch(object):
             item (list): 一组输入，跟feature_name的顺序一致，feature_name即是这一组输入的名字
         """
         if len(item) != len(self.feature_name):
-            raise KeyError('when append a batch, item is not equal length with feature_name')
+            raise KeyError(
+                "when append a batch, item is not equal length with feature_name"
+            )
         for i, key in enumerate(self.feature_name):
             self.data[key].append(item[i])
 
@@ -48,27 +49,32 @@ class Batch(object):
             device(torch.device): GPU/CPU设备
         """
         for key in self.data:
-            if self.feature_name[key] == 'int':
+            if self.feature_name[key] == "int":
                 self.data[key] = torch.LongTensor(np.array(self.data[key])).to(device)
-            elif self.feature_name[key] == 'float':
+            elif self.feature_name[key] == "float":
                 self.data[key] = torch.FloatTensor(np.array(self.data[key])).to(device)
             else:
                 raise TypeError(
-                    'Batch to_tensor, only support int, float but you give {}'.format(self.feature_name[key]))
+                    "Batch to_tensor, only support int, float but you give {}".format(
+                        self.feature_name[key]
+                    )
+                )
 
     def to_ndarray(self):
         for key in self.data:
-            if self.feature_name[key] == 'int':
+            if self.feature_name[key] == "int":
                 self.data[key] = np.array(self.data[key])
-            elif self.feature_name[key] == 'float':
+            elif self.feature_name[key] == "float":
                 self.data[key] = np.array(self.data[key])
             else:
                 raise TypeError(
-                    'Batch to_ndarray, only support int, float but you give {}'.format(self.feature_name[key]))
+                    "Batch to_ndarray, only support int, float but you give {}".format(
+                        self.feature_name[key]
+                    )
+                )
 
 
 class BatchPAD(Batch):
-
     def __init__(self, feature_name, pad_item=None, pad_max_len=None):
         """Summary of class here
 
@@ -101,7 +107,9 @@ class BatchPAD(Batch):
             item (list): 一组输入，跟feature_name的顺序一致，feature_name即是这一组输入的名字
         """
         if len(item) != len(self.feature_name):
-            raise KeyError('when append a batch, item is not equal length with feature_name')
+            raise KeyError(
+                "when append a batch, item is not equal length with feature_name"
+            )
         for i, key in enumerate(self.feature_name):
             # 需保证 item 每个特征的顺序与初始化时传入的 feature_name 中特征的顺序一致
             self.data[key].append(item[i])
@@ -118,14 +126,15 @@ class BatchPAD(Batch):
         for key in self.pad_item:
             # 只对在 pad_item 中的特征进行补齐
             if key not in self.data:
-                raise KeyError('when pad a batch, raise this error!')
+                raise KeyError("when pad a batch, raise this error!")
             max_len = self.pad_len[key]
             if key in self.pad_max_len:
                 max_len = min(self.pad_max_len[key], max_len)
             for i in range(len(self.data[key])):
                 if len(self.data[key][i]) < max_len:
-                    self.data[key][i] += [self.pad_item[key]] * \
-                        (max_len - len(self.data[key][i]))
+                    self.data[key][i] += [self.pad_item[key]] * (
+                        max_len - len(self.data[key][i])
+                    )
                 else:
                     # 截取的原则是，抛弃前面的点
                     # 因为是时间序列嘛
@@ -144,26 +153,35 @@ class BatchPAD(Batch):
             device(torch.device): GPU/CPU设备
         """
         for key in self.data:
-            if self.feature_name[key] == 'int':
+            if self.feature_name[key] == "int":
                 self.data[key] = torch.LongTensor(np.array(self.data[key])).to(device)
-            elif self.feature_name[key] == 'float':
+            elif self.feature_name[key] == "float":
                 self.data[key] = torch.FloatTensor(np.array(self.data[key])).to(device)
-            elif self.feature_name[key] == 'array of int':
+            elif self.feature_name[key] == "array of int":
                 for i in range(len(self.data[key])):
                     for j in range(len(self.data[key][i])):
                         try:
-                            self.data[key][i][j] = torch.LongTensor(np.array(self.data[key][i][j])).to(device)
+                            self.data[key][i][j] = torch.LongTensor(
+                                np.array(self.data[key][i][j])
+                            ).to(device)
                         except TypeError:
-                            print('device is ', device)
+                            print("device is ", device)
                             exit()
-            elif self.feature_name[key] == 'no_pad_int':
+            elif self.feature_name[key] == "no_pad_int":
                 for i in range(len(self.data[key])):
-                    self.data[key][i] = torch.LongTensor(np.array(self.data[key][i])).to(device)
-            elif self.feature_name[key] == 'no_pad_float':
+                    self.data[key][i] = torch.LongTensor(
+                        np.array(self.data[key][i])
+                    ).to(device)
+            elif self.feature_name[key] == "no_pad_float":
                 for i in range(len(self.data[key])):
-                    self.data[key][i] = torch.FloatTensor(np.array(self.data[key][i])).to(device)
-            elif self.feature_name[key] == 'no_tensor':
+                    self.data[key][i] = torch.FloatTensor(
+                        np.array(self.data[key][i])
+                    ).to(device)
+            elif self.feature_name[key] == "no_tensor":
                 pass
             else:
                 raise TypeError(
-                    'Batch to_tensor, only support int, float but you give {}'.format(self.feature_name[key]))
+                    "Batch to_tensor, only support int, float but you give {}".format(
+                        self.feature_name[key]
+                    )
+                )

@@ -4,11 +4,12 @@ from libcity.data.dataset import TrafficStateDataset
 
 
 class TrafficStatePointDataset(TrafficStateDataset):
-
     def __init__(self, config):
         super().__init__(config)
-        self.cache_file_name = os.path.join('./libcity/cache/dataset_cache/',
-                                            'point_based_{}.npz'.format(self.parameters_str))
+        self.cache_file_name = os.path.join(
+            "./libcity/cache/dataset_cache/",
+            "point_based_{}.npz".format(self.parameters_str),
+        )
 
     def _load_geo(self):
         """
@@ -59,6 +60,12 @@ class TrafficStatePointDataset(TrafficStateDataset):
         Returns:
             dict: 包含数据集的相关特征的字典
         """
-        return {"scaler": self.scaler, "adj_mx": self.adj_mx, "ext_dim": self.ext_dim,
-                "num_nodes": self.num_nodes, "feature_dim": self.feature_dim,
-                "output_dim": self.output_dim, "num_batches": self.num_batches}
+        return {
+            "scaler": self.scaler,
+            "adj_mx": self.adj_mx,
+            "ext_dim": self.ext_dim,
+            "num_nodes": self.num_nodes,
+            "feature_dim": self.feature_dim,
+            "output_dim": self.output_dim,
+            "num_batches": self.num_batches,
+        }
