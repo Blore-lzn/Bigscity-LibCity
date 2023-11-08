@@ -251,7 +251,7 @@
             "evaluator": "TrafficStateEvaluator"
         },
         "STSGCN": {
-            "dataset_class": "TrafficStateGridDataset",
+            "dataset_class": "NpzDataset",
             "executor": "TrafficStateExecutor",
             "evaluator": "TrafficStateEvaluator"
         },
